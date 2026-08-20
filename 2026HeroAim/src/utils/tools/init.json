@@ -1,0 +1,192 @@
+
+{
+    "camera": {
+        "usebasecamera": true,
+        "use8mm2": false,
+        "camera_base": {
+            "sn": "FGK26010037",
+            "exposure_time": 12000,
+            "exposure_min_us": 2000,
+            "exposure_max_us": 25000,
+            "acquisition_fps": 0,
+            "gain": 13,
+            "gamma": 2.5,
+            "width": 1280,
+            "height": 1024
+        },     
+        "camera_8mm": {
+            "exposure_time": 4000,
+            "fx": 2295.318443481448,
+            "fy": 2293.408768901428,
+            "u0": 718.408749488545,
+            "v0": 588.798043176500,
+            "gain": 16,
+            "gamma": 2.5,
+            "k1": -0.037045350228,
+            "k2": -0.254310630808,
+            "k3": 1.297430667513,
+            "p1": -0.001404711809,
+            "p2":  -0.003398452875,
+            "pitch": -11.2,
+            "roll": 0,
+            "yaw": -0.8,
+            "trans_x": 0.195,
+            "trans_y": 0,
+            "trans_z": 0.065,
+            "sn": "FDN23020228"
+        },
+        "camera_8mm_2": {
+            "exposure_time": 4000,
+            "fx": 2323.58733904615,
+            "fy": 2320.20607548149,
+            "u0": 756.630160875216,
+            "v0": 578.306765623878,
+            "gain": 16,
+            "gamma": 2.5,
+            "k1": -0.0987377567300858,
+            "k2": 0.363257585254963,
+            "k3": 0.0,
+            "p1": 0.000478951102763368,
+            "p2": 0.0005675078864138978,
+            "pitch": -22.7,
+            "roll": 0,
+            "yaw": -2.039,
+            "trans_x": 0.678,
+            "trans_y": 0.241,
+            "trans_z": -0.168,
+            "sn": "FDN23020227"
+        },
+        "camera_type": 8,
+        "device_type": 0,
+        "picture_path": "../src/utils/data/pictures/armors/",
+        "video_path": "../src/utils/data/videos/test2.mp4"
+    },
+    "controller": {
+        "pic_camera_x": 640.0,
+        "pic_camera_y": 512.0,
+        "mouse_require": false,
+        "armor_fire_window": 10.0,
+        "speed_fire_window": 15.0,
+        "phase_confirm_frames": 4,
+        "speed_confirm_frames": 2,
+
+        "accel_threshold": 0.5,
+        "accel_stable_threshold": 0.05,
+        "accel_stable_frames": 5,        
+        "yaw_fire_range_deg": 15.0
+    },
+    "classifier": {
+        "model": "CNN"
+    },
+    "debug": {
+        "enable": false,
+        "stream": false,
+        "big_id": -1,
+        "color": -2,
+        "mode": 1,
+        "save_step": 2,
+        "shoot_speed": 11.6,
+        "socket": false,
+        "video": false,
+        "show_serial_data": false,
+        "is_nuc": true
+    },
+    "ballistics": {
+        "drag_coeff": 0.29,
+        "gravity": 9.794,
+        "air_density": 1.169,
+        "bullet_mass": 0.041,
+        "bullet_radius": 0.02125,
+        "muzzle_offset": 0.28
+    },
+    "detector": {
+        "color": 1,
+        "score_threshold": 0.75,
+        "nms_threshold": 0.45,
+        "armor_infer_device": "GPU",
+        "armor_model_path": "../src/utils/model/0526.onnx",
+        "car_model_path": "../src/utils/model/yolo11n-416sgd4.xml"
+    },
+    "outpost": {
+        "time_bias": 0,
+        "time_bias_inverse": 0,
+        "tmp_time": 50,
+        "shoot_distance_offset": 0
+    },
+    "predictor": {
+        "init_radius": 0.2,
+        "max_lost_count": 10,
+        "min_consecutive_detections": 3,
+
+        "low_speed_process_noise_xy": 100.0,
+        "low_speed_process_noise_z": 100.0,
+        "low_speed_process_noise_yaw": 400.0,
+        "middle_speed_process_noise_xy": 100.0,
+        "middle_speed_process_noise_z": 100.0,
+        "middle_speed_process_noise_yaw": 400.0,
+        "high_speed_process_noise_xy": 100.0,
+        "high_speed_process_noise_z": 100.0,
+        "high_speed_process_noise_yaw": 400.0,
+        "middle_speed_angular_velocity_threshold": 2.0,
+        "high_speed_angular_velocity_threshold": 4.0,
+        "measurement_noise_yaw": 0.004,
+        "measurement_noise_pitch": 0.004,
+        "measurement_noise_distance_base": 0.1,
+        "measurement_noise_armor_yaw_base": 0.09,
+        "min_valid_radius": 0.05,
+        "max_valid_radius": 0.5
+    },
+    "serialport": {
+        "deviceName": "/dev/ttyACM0",
+        "enable": 1
+    },
+    "anti_base": {
+        "udp_debug_enabled": false,
+        "udp_debug_host": "127.0.0.1",
+        "udp_debug_port": 9999,
+        "output_fps": 30,
+        "stream_pre_encode_frame": false,
+        "packet_size": 300,
+        "max_tx_delay_s": 0.5,
+        "limiter_min_packet_gap_ms": 22,
+        "adaptive_bitrate_enabled": true,
+        "adaptive_bitrate_min_kbps": 90,
+        "adaptive_bitrate_max_kbps": 160,
+        "adaptive_bitrate_step_up_kbps": 3,
+        "adaptive_bitrate_step_down_kbps": 10,
+        "adaptive_bitrate_control_interval_s": 1.0,
+        "log_packet_content": false,
+        "h264": {
+            "speed_preset": 9,
+            "tune": 4,
+            "key_int_max": 35,
+            "bframes": 0,
+            "rc_lookahead": 0,
+            "sync_lookahead": 0,
+            "sliced_threads": true,
+            "ref": 1,
+            "vbv_buf_capacity": 80,
+            "option_string": "repeat-headers=1:scenecut=0:intra-refresh=0:open-gop=0:aq-mode=2:aq-strength=1.0:mbtree=1:qcomp=0.72:deblock=1,1:force-cfr=1"
+        },
+        "preprocess": {
+            "crop_size":960,
+            "crop_offset_x":-120,
+            "output_size":320,
+            "static_simplify": true,
+            "motion_threshold": 12,
+            "motion_erode_px": 1,
+            "motion_dilate_px": 2,
+            "motion_trail_frames": 4,
+            "trail_brightness_gain": 1,
+            "trail_disable_motion_ratio": 0.35,
+            "trail_resume_motion_ratio": 0.25,
+            "motion_ratio_ema_alpha": 0.20,
+            "bg_update_alpha": 0.01,
+            "bg_blur_sigma": 1.2,
+            "center_clear_size": 160,
+            "force_monochrome": false,
+            "target_bitrate_kbps": 130
+        }
+    }
+}
+

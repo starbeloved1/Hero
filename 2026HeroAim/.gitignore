@@ -1,0 +1,7 @@
+build/
+logs/
+Zone.Identifier
+*Zone.Identifier
+*.avi
+
+src/utils/data/videos/

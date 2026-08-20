@@ -1,0 +1,14 @@
+# 激活环境
+source openvino_env/bin/activate
+
+# 找到 site-packages 路径
+SITE_PACKAGES=$(python -c "import site; print(site.getsitepackages()[0])")
+
+# 导出 CMake 路径
+export OpenCV_DIR=${SITE_PACKAGES}/cv2/cmake/
+export OpenVINO_DIR=${SITE_PACKAGES}/openvino/cmake/
+
+cd /mnt/d/stu/rm/hero/HERO26AutoAim/
+
+# 重新运行 CMake
+cmake ..
