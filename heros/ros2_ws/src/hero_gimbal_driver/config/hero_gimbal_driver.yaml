@@ -1,0 +1,13 @@
+hero_gimbal_driver_node:
+  ros__parameters:
+    port_name: /dev/ttyACM0
+    baud_rate: 115200
+    enable_crc_check: true
+    allow_virtual_serial: true
+    enable_fire: true
+    command_flag: 5
+    state_topic: /hero/gimbal/state
+    control_topic: /hero/gimbal/control
+    gimbal_frame_id: gimbal_link
+    state_publish_rate_hz: 200.0
+    command_send_rate_hz: 200.0
