@@ -1,0 +1,15 @@
+hero_tf_node:
+  ros__parameters:
+    gimbal_state_topic: /hero/gimbal/state
+    world_frame_id: world
+    gimbal_frame_id: gimbal_link
+    camera_frame_id: camera_link
+    camera_optical_frame_id: camera_optical_frame
+
+    # camera_8mm标定值
+    camera_trans_x: 0.195
+    camera_trans_y: 0.0
+    camera_trans_z: 0.065
+    camera_yaw_deg: -0.8
+    camera_pitch_deg: -11.2
+    camera_roll_deg: 0.0

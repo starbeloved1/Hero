@@ -18,3 +18,16 @@ source /opt/ros/humble/setup.bash
 colcon build --symlink-install
 source install/setup.bash
 ```
+
+当前已迁移的功能包：
+
+- `hero_msgs`：云台状态与控制命令的公共消息定义。
+- `hero_gimbal_driver`：旧串口协议、CRC、云台状态发布与控制命令下发。
+- `hero_tf`：云台姿态驱动的动态坐标变换，以及相机标定得到的静态坐标变换。
+
+启动已完成的云台通信与坐标系部分：
+
+```bash
+ros2 launch hero_gimbal_driver hero_gimbal_driver.launch.py
+ros2 launch hero_tf hero_tf.launch.py
+```

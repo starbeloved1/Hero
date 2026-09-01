@@ -22,6 +22,12 @@
 
 图像、云台状态和控制话题使用深度为 1、best-effort、volatile 的 QoS。处理节点必须优先处理最新数据，不能积压过期数据；回调函数不得阻塞等待相机、串口、推理或网络 I/O。
 
+## 当前坐标系约定
+
+`hero_tf` 当前维护一条最小坐标树：`world -> gimbal_link -> camera_link -> camera_optical_frame`。`world -> gimbal_link` 由 `hero_msgs/GimbalState` 的 yaw、pitch 动态发布，并严格保留旧 `Solver` 的 `Rz(yaw) * Ry(-pitch)` 方向约定。
+
+`gimbal_link -> camera_link` 使用旧 `init.json` 中 8 mm 相机的平移和 yaw/pitch/roll 标定参数；旧矩阵描述的是“云台坐标到相机坐标”，TF 发布时必须使用其逆旋转。`camera_link` 使用前、左、上（FLU）约定，`camera_optical_frame` 使用 ROS 光学坐标的右、下、前（RDF）约定。枪口、底部相机与第二相机将在对应硬件迁移切片中加入。
+
 ## 迁移顺序
 
 1. 公共接口与云台串口驱动。
