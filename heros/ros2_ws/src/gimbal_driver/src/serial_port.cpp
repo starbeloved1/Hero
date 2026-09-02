@@ -1,11 +1,11 @@
-#include "hero_gimbal_driver/serial_port.hpp"
+#include "gimbal_driver/serial_port.hpp"
 
 #include <algorithm>
 #include <sstream>
 #include <thread>
 #include <utility>
 
-namespace hero_gimbal_driver
+namespace gimbal_driver
 {
 
 using boost::asio::buffer;
@@ -180,4 +180,4 @@ void SerialPort::consume(const uint8_t * data, std::size_t size)
   }
 }
 
-}  // hero_gimbal_driver
+}  // gimbal_driver

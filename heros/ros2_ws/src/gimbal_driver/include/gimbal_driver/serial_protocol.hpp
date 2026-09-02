@@ -5,7 +5,7 @@
 #include <cstdint>
 #include <optional>
 
-namespace hero_gimbal_driver
+namespace gimbal_driver
 {
 
 constexpr std::size_t kReadFrameSize = 16U;
@@ -39,4 +39,4 @@ std::optional<LegacyReadFrame> decodeReadFrame(
   const std::array<uint8_t, kReadFrameSize> & bytes, bool verify_crc);
 std::array<uint8_t, kWriteFrameSize> encodeWriteCommand(const LegacyWriteCommand & command);
 
-}  // hero_gimbal_driver
+}  // gimbal_driver

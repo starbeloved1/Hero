@@ -1,9 +1,9 @@
-#include "hero_gimbal_driver/serial_protocol.hpp"
+#include "gimbal_driver/serial_protocol.hpp"
 
 #include <cmath>
 #include <cstring>
 
-namespace hero_gimbal_driver
+namespace gimbal_driver
 {
 
 namespace
@@ -99,4 +99,4 @@ std::array<uint8_t, kWriteFrameSize> encodeWriteCommand(const LegacyWriteCommand
   return bytes;
 }
 
-}  // hero_gimbal_driver
+}  // gimbal_driver

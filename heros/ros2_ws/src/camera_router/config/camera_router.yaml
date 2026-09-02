@@ -1,0 +1,12 @@
+camera_router_node:
+  ros__parameters:
+    gimbal_state_topic: /hero/gimbal/state
+    base_camera_enabled: true
+
+    aim8mm_image_topic: /hero/camera/aim8mm/image_raw
+    aim8mm_camera_info_topic: /hero/camera/aim8mm/camera_info
+    base_image_topic: /hero/camera/base/image_raw
+    base_camera_info_topic: /hero/camera/base/camera_info
+
+    selected_image_topic: /hero/camera/selected/image_raw
+    selected_camera_info_topic: /hero/camera/selected/camera_info

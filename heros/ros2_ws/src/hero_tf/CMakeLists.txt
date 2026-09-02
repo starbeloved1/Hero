@@ -17,7 +17,10 @@ target_compile_features(hero_tf_math PUBLIC cxx_std_17)
 target_include_directories(hero_tf_math PUBLIC include)
 ament_target_dependencies(hero_tf_math tf2)
 
-add_executable(hero_tf_node src/hero_tf_node.cpp)
+add_executable(hero_tf_node
+  src/main.cpp
+  src/hero_tf_node.cpp
+)
 target_compile_features(hero_tf_node PUBLIC cxx_std_17)
 target_include_directories(hero_tf_node PRIVATE include)
 target_link_libraries(hero_tf_node hero_tf_math)

@@ -5,9 +5,9 @@
 
 #include <gtest/gtest.h>
 
-#include "hero_gimbal_driver/serial_protocol.hpp"
+#include "gimbal_driver/serial_protocol.hpp"
 
-namespace hero_gimbal_driver
+namespace gimbal_driver
 {
 
 namespace
@@ -78,4 +78,4 @@ TEST(SerialProtocol, EncodesLegacyWriteFrame)
 
 }  // namespace
 
-}  // hero_gimbal_driver
+}  // gimbal_driver

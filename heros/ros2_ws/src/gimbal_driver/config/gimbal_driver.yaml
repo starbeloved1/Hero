@@ -1,4 +1,4 @@
-hero_gimbal_driver_node:
+gimbal_driver_node:
   ros__parameters:
     port_name: /dev/ttyACM0
     baud_rate: 115200

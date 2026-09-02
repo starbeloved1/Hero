@@ -6,7 +6,7 @@ hero_tf_node:
     camera_frame_id: camera_link
     camera_optical_frame_id: camera_optical_frame
 
-    # camera_8mm标定值
+    # camera_8mm外参值
     camera_trans_x: 0.195
     camera_trans_y: 0.0
     camera_trans_z: 0.065

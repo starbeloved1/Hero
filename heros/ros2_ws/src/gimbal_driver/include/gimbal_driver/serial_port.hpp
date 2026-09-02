@@ -11,9 +11,9 @@
 
 #include <boost/asio.hpp>
 
-#include "hero_gimbal_driver/serial_protocol.hpp"
+#include "gimbal_driver/serial_protocol.hpp"
 
-namespace hero_gimbal_driver
+namespace gimbal_driver
 {
 
 class SerialPort
@@ -52,4 +52,4 @@ private:
   ErrorCallback error_callback_;
 };
 
-}  // hero_gimbal_driver
+}  // gimbal_driver

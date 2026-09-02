@@ -4,13 +4,13 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
-    config = get_package_share_directory("hero_gimbal_driver") + "/config/hero_gimbal_driver.yaml"
+    config_path = get_package_share_directory("camera_router") + "/config/camera_router.yaml"
     return LaunchDescription([
         Node(
-            package="hero_gimbal_driver",
-            executable="hero_gimbal_driver_node",
-            name="hero_gimbal_driver_node",
+            package="camera_router",
+            executable="camera_router_node",
+            name="camera_router_node",
             output="screen",
-            parameters=[config],
+            parameters=[config_path],
         )
     ])
