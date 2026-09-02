@@ -136,7 +136,7 @@ void GimbalDriverNode::publishState()
   message.pitch = static_cast<float>(state->frame.pitch_deg * kDegreesToRadians);
   message.mode = toMode(state->frame.mode_flag);
   message.raw_mode_flag = state->frame.mode_flag;
-  message.enemy_color = state->frame.enemy_color;
+  message.robot_color = state->frame.robot_color;
   message.right_clicked = state->frame.right_clicked;
   message.up = state->frame.up;
   message.down = state->frame.down;

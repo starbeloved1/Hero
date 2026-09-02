@@ -14,11 +14,12 @@
 
 | 功能包 | 状态 | 责任与已确定接口 |
 | --- | --- | --- |
-| `hero_msgs` | 已完成 | 公共消息包。`GimbalState` 对应旧 `SerialPortData`；`ControlCommand` 对应旧 `SerialPortWriteData`。 |
+| `hero_msgs` | 已完成 | 公共消息包。`GimbalState` 对应旧 `SerialPortData`；`ControlCommand` 对应旧 `SerialPortWriteData`；`Armor` 与 `ArmorArray` 传递装甲板二维检测结果。 |
 | `gimbal_driver` | 已完成 | 保留旧串口协议：16 字节接收帧、14 字节发送帧、反射 CRC-16（多项式 `0x8408`、初值 `0xffff`）。发布 `/hero/gimbal/state`，订阅 `/hero/gimbal/control`，并在 ROS 弧度与串口角度制之间转换。`enable_fire` 默认关闭；`allow_virtual_serial` 仅限离线测试。 |
 | `hero_tf` | 已完成 | 维护 `world -> gimbal_link -> camera_link -> camera_optical_frame`。包名按当前决定保留；实现已整理为 `hero_tf_node.hpp`、`hero_tf_node.cpp` 与 `main.cpp`。 |
 | `camera_router` | 已完成第一部分 | 按模式在主 8 mm 与基地相机之间选择并原样转发图像和内参。第二台 8 mm 尚未加入。 |
 | `camera_driver` | 已完成 SDK 与本地视频后端 | 每路可通过 YAML 的 `source` 选择 `daheng` 或 `video`。大恒模式严格按 SN 打开主 8 mm 与基地相机，Bayer 图像转换为 `bgr8`；视频模式通过 OpenCV 回放本地文件。两种输入均按同一 YAML 内参和 topic 发布给 `camera_router`。已完成构建、输入源单元测试与本地视频发布验证，待真实相机接入验证。 |
+| `armor_detector` | 已完成第一版 | 迁移旧 `ArmorOneStage` 的 OpenVINO 0526 模型推理、颜色筛选、类别映射、NMS 与二维四角点输出。订阅 `/hero/camera/selected/image_raw`，发布 `/hero/detector/armors`（`ArmorArray`）。0526 模型统一放在 `heros/model/0526.onnx`；已完成构建、纯逻辑单测和模型加载启动验证，待录像端到端验证。 |
 
 ## 坐标系与标定决定
 
@@ -35,12 +36,19 @@
 - 路由器不修改 `Image` 或 `CameraInfo` 的 `header.stamp`、`header.frame_id`。
 - 主 8 mm 内参来自旧 `init.json`；基地相机旧配置没有内参，因此当前 `CameraInfo` 的标定数组为零，不能用于基地相机 PnP，获得标定后必须补齐。
 
+## 颜色与检测接口决定
+
+- 串口接收帧第 12 字节在旧工程中名为 `color`；旧 `ArmorOneStage::setColorFlag()` 会将 `0` 和 `1` 翻转后再筛选模型输出，因此该字段的准确语义是己方机器人颜色。`GimbalState` 统一命名为 `robot_color`，不再使用容易误导的 `enemy_color`。
+- `armor_detector` 的 `target_color: -1` 表示根据 `robot_color` 自动取相反颜色；`-2` 表示不做颜色筛选，适用于没有串口状态的离线录像；`0` 或 `1` 表示固定筛选颜色。
+- `ArmorArray.header` 与其中每个 `Armor.header` 都继承输入图像的时间戳与相机 `frame_id`。每个装甲板输出四个像素角点、Hero 编号、模型颜色类别和置信度；三维 PnP 不属于本包，留给后续解算模块。
+
 ## 环境限制与下一步
 
 - Galaxy Linux-x86 SDK `2.6.2606.9251` 已安装在 `/opt/galaxy_sdk`，系统已能加载 `/usr/lib/libgxiapi.so`；官方单相机示例已编译成功。
+- 当前用户环境已有 OpenVINO C++ 运行时，但位于用户本地安装目录；构建和运行 `armor_detector` 前需在终端设置对应的 `OpenVINO_DIR` 与运行库路径，路径不得写入项目 YAML 或 CMake。
 - 当前没有连接大恒 USB 或 GigE 相机，因此 `camera_driver` 尚不能做真实采图验证。接入相机后需要重新插拔或重启，再使用实际序列号运行 launch。
 - 可通过 `camera_driver/config/camera_driver.local.yaml` 离线回放主 8 mm 视频；该配置要求填写本机录像路径，默认关闭基地相机。视频保持真实相机的 topic 与 `CameraInfo` 接口，可用于路由、检测和算法的离线开发；视频分辨率必须与配置标定一致。
-- 下一步可使用本地视频迁移和验证检测模块；在上车前仍须验证两台真实相机的设备发现、SN 匹配、图像话题、时间戳和路由切换。
+- 下一步使用下载的本地视频启动 `camera_driver`、`camera_router` 和 `armor_detector`，核对 `/hero/detector/armors` 的时间戳、相机坐标系、编号、颜色、角点和检测频率；随后迁移 PnP/解算模块。在上车前仍须验证两台真实相机的设备发现、SN 匹配、图像话题、时间戳和路由切换。
 - 后续迁移顺序：相机采集 → 检测 → PnP/解算 → 普通/反陀螺控制 → 追踪预测 → 反基地与 MQTT → 全系统 launch、rosbag 回归、部署验证。
 
 ## 已验证命令

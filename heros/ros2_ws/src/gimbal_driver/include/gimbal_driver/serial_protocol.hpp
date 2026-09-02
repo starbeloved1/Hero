@@ -20,7 +20,7 @@ struct LegacyReadFrame
   float yaw_deg{0.0F};
   bool up{false};
   bool down{false};
-  uint8_t enemy_color{0U};
+  uint8_t robot_color{0U};
   bool right_clicked{false};
 };
 

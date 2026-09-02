@@ -40,7 +40,7 @@ TEST(SerialProtocol, DecodesLegacyReadFrameAndNormalizesYaw)
   EXPECT_FLOAT_EQ(decoded->yaw_deg, -170.0F);
   EXPECT_TRUE(decoded->up);
   EXPECT_FALSE(decoded->down);
-  EXPECT_EQ(decoded->enemy_color, 2U);
+  EXPECT_EQ(decoded->robot_color, 2U);
   EXPECT_TRUE(decoded->right_clicked);
 }
 

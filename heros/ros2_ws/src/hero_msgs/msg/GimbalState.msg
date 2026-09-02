@@ -10,7 +10,8 @@ float32 yaw
 float32 pitch
 uint8 mode
 uint8 raw_mode_flag
-uint8 enemy_color
+#己方机器人颜色
+uint8 robot_color
 bool right_clicked
 bool up
 bool down

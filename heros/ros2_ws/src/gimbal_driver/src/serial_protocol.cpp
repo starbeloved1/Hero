@@ -76,7 +76,7 @@ std::optional<LegacyReadFrame> decodeReadFrame(
   frame.yaw_deg = normalizeYawDegrees(readScalar<float>(bytes.data() + 6U));
   frame.up = bytes[10] != 0U;
   frame.down = bytes[11] != 0U;
-  frame.enemy_color = bytes[12];
+  frame.robot_color = bytes[12];
   frame.right_clicked = bytes[13] != 0U;
   if (!std::isfinite(frame.pitch_deg) || !std::isfinite(frame.yaw_deg)) {
     return std::nullopt;

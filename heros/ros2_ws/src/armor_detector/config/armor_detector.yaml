@@ -1,0 +1,13 @@
+armor_detector_node:
+  ros__parameters:
+    image_topic: /hero/camera/selected/image_raw
+    gimbal_state_topic: /hero/gimbal/state
+    armor_topic: /hero/detector/armors
+
+    model_path: model/0526.onnx
+    inference_device: GPU
+    confidence_threshold: 0.75
+    nms_threshold: 0.45
+
+    # -1自动选择敌方；-2不按颜色过滤；0/1固定敌方颜色。0=蓝色，1=红色
+    target_color: -1

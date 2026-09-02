@@ -26,6 +26,7 @@ source install/setup.bash
 - `hero_tf`：云台姿态驱动的动态坐标变换，以及相机标定得到的静态坐标变换。
 - `camera_router`：按云台模式选择主 8mm 或基地相机的图像与相机内参。
 - `camera_driver`：通过大恒 SDK 或本地视频发布相机图像与标定参数。
+- `armor_detector`：使用 0526 OpenVINO 模型输出装甲板二维四角点、编号、颜色和置信度。
 
 启动已完成的云台通信与坐标系部分：
 
@@ -33,6 +34,7 @@ source install/setup.bash
 ros2 launch gimbal_driver gimbal_driver.launch.py
 ros2 launch hero_tf hero_tf.launch.py
 ros2 launch camera_router camera_router.launch.py
+ros2 launch armor_detector armor_detector.launch.py
 ```
 
 ## 本地视频回放
@@ -52,3 +54,5 @@ ros2 launch camera_driver camera_driver.launch.py \
 
 `video_rate_hz: 0.0` 表示按录像记录的 FPS 回放，`video_loop: true` 表示读到末尾后从头循环。
 本地视频只是离线输入，不替代真实相机、时间同步和硬件链路验证。
+
+本地回放没有串口颜色状态时，将 `armor_detector.yaml` 中的 `target_color` 改为 `-2`，使检测器不过滤模型输出颜色。
