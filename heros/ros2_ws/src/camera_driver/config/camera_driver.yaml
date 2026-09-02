@@ -1,0 +1,39 @@
+camera_driver_node:
+  ros__parameters:
+    aim8mm.enabled: true
+    aim8mm.serial_number: FDN23020228
+    aim8mm.frame_id: camera_optical_frame
+    aim8mm.image_topic: /hero/camera/aim8mm/image_raw
+    aim8mm.camera_info_topic: /hero/camera/aim8mm/camera_info
+    aim8mm.width: 1280
+    aim8mm.height: 1024
+    aim8mm.exposure_time_us: 4000.0
+    aim8mm.gain: 16.0
+    aim8mm.fx: 2295.318443481448
+    aim8mm.fy: 2293.408768901428
+    aim8mm.cx: 718.408749488545
+    aim8mm.cy: 588.798043176500
+    aim8mm.k1: -0.037045350228
+    aim8mm.k2: -0.254310630808
+    aim8mm.p1: -0.001404711809
+    aim8mm.p2: -0.003398452875
+    aim8mm.k3: 1.297430667513
+    
+    base.enabled: true
+    base.serial_number: FGK26010037
+    base.frame_id: base_camera_optical_frame
+    base.image_topic: /hero/camera/base/image_raw
+    base.camera_info_topic: /hero/camera/base/camera_info
+    base.width: 1280
+    base.height: 1024
+    base.exposure_time_us: 12000.0
+    base.gain: 13.0
+    base.fx: 0.0
+    base.fy: 0.0
+    base.cx: 0.0
+    base.cy: 0.0
+    base.k1: 0.0
+    base.k2: 0.0
+    base.p1: 0.0
+    base.p2: 0.0
+    base.k3: 0.0

@@ -18,6 +18,7 @@
 | `gimbal_driver` | 已完成 | 保留旧串口协议：16 字节接收帧、14 字节发送帧、反射 CRC-16（多项式 `0x8408`、初值 `0xffff`）。发布 `/hero/gimbal/state`，订阅 `/hero/gimbal/control`，并在 ROS 弧度与串口角度制之间转换。`enable_fire` 默认关闭；`allow_virtual_serial` 仅限离线测试。 |
 | `hero_tf` | 已完成 | 维护 `world -> gimbal_link -> camera_link -> camera_optical_frame`。包名按当前决定保留；实现已整理为 `hero_tf_node.hpp`、`hero_tf_node.cpp` 与 `main.cpp`。 |
 | `camera_router` | 已完成第一部分 | 按模式在主 8 mm 与基地相机之间选择并原样转发图像和内参。第二台 8 mm 尚未加入。 |
+| `camera_driver` | 已完成 SDK 后端 | 使用 Galaxy C/C++ SDK，严格按 SN 打开主 8 mm 与基地相机，Bayer 图像转换为 `bgr8`，按 YAML 配置分别发布给 `camera_router` 的两路输入。已完成构建，待真实相机接入验证。 |
 
 ## 坐标系与标定决定
 
@@ -32,12 +33,13 @@
 - 输出：`/hero/camera/selected/{image_raw,camera_info}`。
 - `MODE_ANTI_BASE`（模式 4）且 `base_camera_enabled: true` 时选择基地相机；其余模式选择主 8 mm。
 - 路由器不修改 `Image` 或 `CameraInfo` 的 `header.stamp`、`header.frame_id`。
+- 主 8 mm 内参来自旧 `init.json`；基地相机旧配置没有内参，因此当前 `CameraInfo` 的标定数组为零，不能用于基地相机 PnP，获得标定后必须补齐。
 
 ## 环境限制与下一步
 
-- 当前机器具有 ROS Humble、OpenCV、`sensor_msgs`，但缺少大恒 SDK 的 `gxiapi`、`dximageproc` 库和系统头文件。
-- 因此真实大恒采集后端尚未迁移。下一切片是 `camera_driver`：在 SDK 可用的机器上接入真实设备，并为各 profile 发布 `Image + CameraInfo`，供 `camera_router` 使用。
-- 不得伪造真实大恒设备可运行；可先实现并验证不依赖 SDK 的接口或离线回放逻辑。
+- Galaxy Linux-x86 SDK `2.6.2606.9251` 已安装在 `/opt/galaxy_sdk`，系统已能加载 `/usr/lib/libgxiapi.so`；官方单相机示例已编译成功。
+- 当前没有连接大恒 USB 或 GigE 相机，因此 `camera_driver` 尚不能做真实采图验证。接入相机后需要重新插拔或重启，再使用实际序列号运行 launch。
+- 下一步是在连接两台相机后验证设备发现、SN 匹配、图像话题、时间戳和路由切换；之后才进入检测迁移。
 - 后续迁移顺序：相机采集 → 检测 → PnP/解算 → 普通/反陀螺控制 → 追踪预测 → 反基地与 MQTT → 全系统 launch、rosbag 回归、部署验证。
 
 ## 已验证命令
@@ -51,6 +53,7 @@ source install/setup.bash
 colcon test --packages-select gimbal_driver
 colcon test --packages-select hero_tf
 colcon test --packages-select camera_router
+colcon build --packages-up-to camera_driver --symlink-install
 colcon test-result --verbose
 ```
 
