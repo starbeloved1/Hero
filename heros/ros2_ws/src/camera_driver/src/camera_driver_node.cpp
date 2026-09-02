@@ -1,14 +1,16 @@
 #include "camera_driver/camera_driver_node.hpp"
 
-#include <algorithm>
-#include <array>
+#include <chrono>
 #include <stdexcept>
 #include <string>
 #include <thread>
 
+#include <opencv2/imgproc.hpp>
+#include <opencv2/videoio.hpp>
 #include <sensor_msgs/msg/camera_info.hpp>
 #include <sensor_msgs/msg/image.hpp>
 
+#include "camera_driver/camera_source.hpp"
 #include "camera_driver/daheng_camera.hpp"
 
 namespace camera_driver
@@ -28,11 +30,22 @@ struct CameraDriverNode::Stream
 {
   std::string name;
   std::string frame_id;
+  CameraSource source{CameraSource::kDaheng};
   DahengCamera camera;
+  cv::VideoCapture video;
+  bool video_loop{true};
+  std::chrono::nanoseconds video_period{0};
   sensor_msgs::msg::CameraInfo camera_info;
   rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr image_pub;
   rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr camera_info_pub;
   std::thread thread;
+};
+
+struct CameraDriverNode::Frame
+{
+  std::uint32_t width{0};
+  std::uint32_t height{0};
+  std::vector<std::uint8_t> bgr_data;
 };
 
 CameraDriverNode::CameraDriverNode()
@@ -41,7 +54,11 @@ CameraDriverNode::CameraDriverNode()
   declare_parameter<bool>("aim8mm.enabled", true);
   declare_parameter<bool>("base.enabled", true);
   for (const auto & name : {"aim8mm", "base"}) {
+    declare_parameter<std::string>(std::string(name) + ".source", "daheng");
     declare_parameter<std::string>(std::string(name) + ".serial_number", "");
+    declare_parameter<std::string>(std::string(name) + ".video_path", "");
+    declare_parameter<bool>(std::string(name) + ".video_loop", true);
+    declare_parameter<double>(std::string(name) + ".video_rate_hz", 0.0);
     declare_parameter<std::string>(std::string(name) + ".frame_id", std::string(name) + "_camera_optical_frame");
     declare_parameter<std::string>(
       std::string(name) + ".image_topic", std::string("/hero/camera/") + name + "/image_raw");
@@ -69,15 +86,53 @@ CameraDriverNode::CameraDriverNode()
     auto stream = std::make_unique<Stream>();
     stream->name = name;
     stream->frame_id = get_parameter(std::string(name) + ".frame_id").as_string();
+    stream->source = parseCameraSource(get_parameter(std::string(name) + ".source").as_string());
     DahengCameraConfig config;
     config.serial_number = get_parameter(std::string(name) + ".serial_number").as_string();
     config.width = get_parameter(std::string(name) + ".width").as_int();
     config.height = get_parameter(std::string(name) + ".height").as_int();
     config.exposure_time_us = get_parameter(std::string(name) + ".exposure_time_us").as_double();
     config.gain = get_parameter(std::string(name) + ".gain").as_double();
-    std::string error;
-    if (!stream->camera.open(config, error)) {
-      throw std::runtime_error(name + std::string(" 相机打开失败：") + error);
+    if (stream->source == CameraSource::kDaheng) {
+      std::string error;
+      if (!stream->camera.open(config, error)) {
+        throw std::runtime_error(name + std::string(" 相机打开失败：") + error);
+      }
+    } else {
+      const auto video_path = get_parameter(std::string(name) + ".video_path").as_string();
+      if (video_path.empty()) {
+        throw std::runtime_error(name + std::string(" 本地视频路径不能为空"));
+      }
+      if (!stream->video.open(video_path)) {
+        throw std::runtime_error(name + std::string(" 无法打开本地视频：") + video_path);
+      }
+      const auto video_width = static_cast<int>(stream->video.get(cv::CAP_PROP_FRAME_WIDTH));
+      const auto video_height = static_cast<int>(stream->video.get(cv::CAP_PROP_FRAME_HEIGHT));
+      if (video_width != config.width || video_height != config.height) {
+        throw std::runtime_error(
+                name + std::string(" 视频分辨率与标定配置不一致：视频为 ") +
+                std::to_string(video_width) + "x" + std::to_string(video_height) + "，配置为 " +
+                std::to_string(config.width) + "x" + std::to_string(config.height));
+      }
+      stream->video_loop = get_parameter(std::string(name) + ".video_loop").as_bool();
+      const auto configured_rate = get_parameter(std::string(name) + ".video_rate_hz").as_double();
+      if (configured_rate < 0.0) {
+        throw std::runtime_error(name + std::string(" video_rate_hz 不能为负数"));
+      }
+      const auto video_rate = stream->video.get(cv::CAP_PROP_FPS);
+      const auto publish_rate = configured_rate > 0.0 ? configured_rate : video_rate;
+      if (publish_rate > 0.0) {
+        stream->video_period = std::chrono::duration_cast<std::chrono::nanoseconds>(
+          std::chrono::duration<double>(1.0 / publish_rate));
+      } else {
+        stream->video_period = std::chrono::milliseconds(33);
+        RCLCPP_WARN(
+          get_logger(), "%s 视频未提供有效 FPS，按 30 Hz 回放", name);
+      }
+      RCLCPP_INFO(
+        get_logger(), "%s 使用本地视频：%s，回放频率 %.2f Hz，%s循环", name, video_path.c_str(),
+        1.0 / std::chrono::duration<double>(stream->video_period).count(),
+        stream->video_loop ? "启用" : "不启用");
     }
     const auto image_topic = get_parameter(std::string(name) + ".image_topic").as_string();
     const auto camera_info_topic = get_parameter(std::string(name) + ".camera_info_topic").as_string();
@@ -125,9 +180,13 @@ CameraDriverNode::~CameraDriverNode()
 void CameraDriverNode::captureLoop(Stream & stream)
 {
   while (rclcpp::ok() && running_.load()) {
-    DahengFrame frame;
+    Frame frame;
     std::string error;
-    if (!stream.camera.read(frame, error)) {
+    if (!readFrame(stream, frame, error)) {
+      if (error.empty()) {
+        RCLCPP_INFO(get_logger(), "%s 本地视频已播放结束", stream.name.c_str());
+        return;
+      }
       RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000, "%s 相机取图失败：%s", stream.name.c_str(), error.c_str());
       continue;
     }
@@ -140,7 +199,67 @@ void CameraDriverNode::captureLoop(Stream & stream)
     info.header = image.header;
     stream.image_pub->publish(image);
     stream.camera_info_pub->publish(info);
+    if (stream.source == CameraSource::kVideo) {
+      std::this_thread::sleep_for(stream.video_period);
+    }
   }
+}
+
+bool CameraDriverNode::readFrame(Stream & stream, Frame & frame, std::string & error)
+{
+  if (stream.source == CameraSource::kVideo) {
+    return readVideoFrame(stream, frame, error);
+  }
+
+  DahengFrame daheng_frame;
+  if (!stream.camera.read(daheng_frame, error)) {
+    return false;
+  }
+  frame.width = daheng_frame.width;
+  frame.height = daheng_frame.height;
+  frame.bgr_data = std::move(daheng_frame.bgr_data);
+  return true;
+}
+
+bool CameraDriverNode::readVideoFrame(Stream & stream, Frame & frame, std::string & error)
+{
+  cv::Mat source_image;
+  if (!stream.video.read(source_image) || source_image.empty()) {
+    if (!stream.video_loop) {
+      error.clear();
+      return false;
+    }
+    stream.video.set(cv::CAP_PROP_POS_FRAMES, 0.0);
+    if (!stream.video.read(source_image) || source_image.empty()) {
+      error = "本地视频无法读取有效图像帧";
+      return false;
+    }
+  }
+
+  cv::Mat bgr_image;
+  if (source_image.channels() == 3) {
+    bgr_image = source_image;
+  } else if (source_image.channels() == 1) {
+    cv::cvtColor(source_image, bgr_image, cv::COLOR_GRAY2BGR);
+  } else if (source_image.channels() == 4) {
+    cv::cvtColor(source_image, bgr_image, cv::COLOR_BGRA2BGR);
+  } else {
+    error = "本地视频图像通道数不受支持";
+    return false;
+  }
+  if (bgr_image.depth() != CV_8U) {
+    error = "本地视频图像不是 8 位格式";
+    return false;
+  }
+  if (!bgr_image.isContinuous()) {
+    bgr_image = bgr_image.clone();
+  }
+  frame.width = static_cast<std::uint32_t>(bgr_image.cols);
+  frame.height = static_cast<std::uint32_t>(bgr_image.rows);
+  frame.bgr_data.assign(
+    bgr_image.data,
+    bgr_image.data + static_cast<std::size_t>(frame.width) * frame.height * 3U);
+  return true;
 }
 
 }  // camera_driver

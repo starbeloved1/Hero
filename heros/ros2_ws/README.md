@@ -25,6 +25,7 @@ source install/setup.bash
 - `gimbal_driver`：旧串口协议、CRC、云台状态发布与控制命令下发。
 - `hero_tf`：云台姿态驱动的动态坐标变换，以及相机标定得到的静态坐标变换。
 - `camera_router`：按云台模式选择主 8mm 或基地相机的图像与相机内参。
+- `camera_driver`：通过大恒 SDK 或本地视频发布相机图像与标定参数。
 
 启动已完成的云台通信与坐标系部分：
 
@@ -33,3 +34,21 @@ ros2 launch gimbal_driver gimbal_driver.launch.py
 ros2 launch hero_tf hero_tf.launch.py
 ros2 launch camera_router camera_router.launch.py
 ```
+
+## 本地视频回放
+
+`camera_driver` 的每一路输入可通过 `<相机名>.source` 选择 `daheng` 或 `video`。选择
+`video` 后，节点使用 OpenCV 读取本地视频，但仍发布与真实相机完全相同的图像和标定话题，
+所以可以在不连接机器人时验证路由、检测和后续算法。
+
+以 8mm 相机为例，先复制 `src/camera_driver/config/camera_driver.local.yaml` 到不提交 Git 的
+本地位置，填写 `aim8mm.video_path` 为实际录像路径；录像分辨率必须与 `width`、`height` 和
+标定参数匹配。然后启动：
+
+```bash
+ros2 launch camera_driver camera_driver.launch.py \
+  config_file:=/你的本地路径/camera_driver.local.yaml
+```
+
+`video_rate_hz: 0.0` 表示按录像记录的 FPS 回放，`video_loop: true` 表示读到末尾后从头循环。
+本地视频只是离线输入，不替代真实相机、时间同步和硬件链路验证。

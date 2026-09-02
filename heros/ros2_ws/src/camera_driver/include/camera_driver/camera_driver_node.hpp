@@ -17,7 +17,11 @@ public:
 
 private:
   struct Stream;
+  struct Frame;
+
   void captureLoop(Stream & stream);
+  bool readFrame(Stream & stream, Frame & frame, std::string & error);
+  bool readVideoFrame(Stream & stream, Frame & frame, std::string & error);
 
   std::atomic<bool> running_{false};
   std::vector<std::unique_ptr<Stream>> streams_;

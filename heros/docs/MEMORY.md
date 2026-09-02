@@ -18,7 +18,7 @@
 | `gimbal_driver` | 已完成 | 保留旧串口协议：16 字节接收帧、14 字节发送帧、反射 CRC-16（多项式 `0x8408`、初值 `0xffff`）。发布 `/hero/gimbal/state`，订阅 `/hero/gimbal/control`，并在 ROS 弧度与串口角度制之间转换。`enable_fire` 默认关闭；`allow_virtual_serial` 仅限离线测试。 |
 | `hero_tf` | 已完成 | 维护 `world -> gimbal_link -> camera_link -> camera_optical_frame`。包名按当前决定保留；实现已整理为 `hero_tf_node.hpp`、`hero_tf_node.cpp` 与 `main.cpp`。 |
 | `camera_router` | 已完成第一部分 | 按模式在主 8 mm 与基地相机之间选择并原样转发图像和内参。第二台 8 mm 尚未加入。 |
-| `camera_driver` | 已完成 SDK 后端 | 使用 Galaxy C/C++ SDK，严格按 SN 打开主 8 mm 与基地相机，Bayer 图像转换为 `bgr8`，按 YAML 配置分别发布给 `camera_router` 的两路输入。已完成构建，待真实相机接入验证。 |
+| `camera_driver` | 已完成 SDK 与本地视频后端 | 每路可通过 YAML 的 `source` 选择 `daheng` 或 `video`。大恒模式严格按 SN 打开主 8 mm 与基地相机，Bayer 图像转换为 `bgr8`；视频模式通过 OpenCV 回放本地文件。两种输入均按同一 YAML 内参和 topic 发布给 `camera_router`。已完成构建、输入源单元测试与本地视频发布验证，待真实相机接入验证。 |
 
 ## 坐标系与标定决定
 
@@ -39,7 +39,8 @@
 
 - Galaxy Linux-x86 SDK `2.6.2606.9251` 已安装在 `/opt/galaxy_sdk`，系统已能加载 `/usr/lib/libgxiapi.so`；官方单相机示例已编译成功。
 - 当前没有连接大恒 USB 或 GigE 相机，因此 `camera_driver` 尚不能做真实采图验证。接入相机后需要重新插拔或重启，再使用实际序列号运行 launch。
-- 下一步是在连接两台相机后验证设备发现、SN 匹配、图像话题、时间戳和路由切换；之后才进入检测迁移。
+- 可通过 `camera_driver/config/camera_driver.local.yaml` 离线回放主 8 mm 视频；该配置要求填写本机录像路径，默认关闭基地相机。视频保持真实相机的 topic 与 `CameraInfo` 接口，可用于路由、检测和算法的离线开发；视频分辨率必须与配置标定一致。
+- 下一步可使用本地视频迁移和验证检测模块；在上车前仍须验证两台真实相机的设备发现、SN 匹配、图像话题、时间戳和路由切换。
 - 后续迁移顺序：相机采集 → 检测 → PnP/解算 → 普通/反陀螺控制 → 追踪预测 → 反基地与 MQTT → 全系统 launch、rosbag 回归、部署验证。
 
 ## 已验证命令

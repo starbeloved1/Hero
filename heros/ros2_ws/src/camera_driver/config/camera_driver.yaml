@@ -1,7 +1,11 @@
 camera_driver_node:
   ros__parameters:
     aim8mm.enabled: true
+    aim8mm.source: daheng
     aim8mm.serial_number: FDN23020228
+    aim8mm.video_path: ""
+    aim8mm.video_loop: true
+    aim8mm.video_rate_hz: 0.0
     aim8mm.frame_id: camera_optical_frame
     aim8mm.image_topic: /hero/camera/aim8mm/image_raw
     aim8mm.camera_info_topic: /hero/camera/aim8mm/camera_info
@@ -20,7 +24,11 @@ camera_driver_node:
     aim8mm.k3: 1.297430667513
     
     base.enabled: true
+    base.source: daheng
     base.serial_number: FGK26010037
+    base.video_path: ""
+    base.video_loop: true
+    base.video_rate_hz: 0.0
     base.frame_id: base_camera_optical_frame
     base.image_topic: /hero/camera/base/image_raw
     base.camera_info_topic: /hero/camera/base/camera_info

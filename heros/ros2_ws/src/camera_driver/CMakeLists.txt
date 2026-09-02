@@ -8,6 +8,7 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(OpenCV REQUIRED)
 
 set(DAHENG_SDK_ROOT "/opt/galaxy_sdk" CACHE PATH "Galaxy SDK 安装目录")
 find_path(DAHENG_INCLUDE_DIR GxIAPI.h HINTS "${DAHENG_SDK_ROOT}/inc")
@@ -21,13 +22,23 @@ target_compile_features(daheng_camera PUBLIC cxx_std_17)
 target_include_directories(daheng_camera PUBLIC include "${DAHENG_INCLUDE_DIR}")
 target_link_libraries(daheng_camera PUBLIC "${DAHENG_GXIAPI_LIBRARY}")
 
+add_library(camera_source src/camera_source.cpp)
+target_compile_features(camera_source PUBLIC cxx_std_17)
+target_include_directories(camera_source PUBLIC include)
+
 add_executable(camera_driver_node src/main.cpp src/camera_driver_node.cpp)
 target_compile_features(camera_driver_node PUBLIC cxx_std_17)
 target_include_directories(camera_driver_node PRIVATE include)
-target_link_libraries(camera_driver_node daheng_camera)
+target_link_libraries(camera_driver_node daheng_camera camera_source ${OpenCV_LIBS})
 ament_target_dependencies(camera_driver_node rclcpp sensor_msgs)
 
-install(TARGETS daheng_camera camera_driver_node
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+  ament_add_gtest(test_camera_source test/test_camera_source.cpp)
+  target_link_libraries(test_camera_source camera_source)
+endif()
+
+install(TARGETS daheng_camera camera_source camera_driver_node
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME}
