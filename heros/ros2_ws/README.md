@@ -43,16 +43,40 @@ ros2 launch armor_detector armor_detector.launch.py
 `video` 后，节点使用 OpenCV 读取本地视频，但仍发布与真实相机完全相同的图像和标定话题，
 所以可以在不连接机器人时验证路由、检测和后续算法。
 
-以 8mm 相机为例，先复制 `src/camera_driver/config/camera_driver.local.yaml` 到不提交 Git 的
-本地位置，填写 `aim8mm.video_path` 为实际录像路径；录像分辨率必须与 `width`、`height` 和
-标定参数匹配。然后启动：
+以 8mm 相机为例，在 `camera_driver.yaml` 中将 `aim8mm.source` 改为 `video`，填写
+`aim8mm.video_path: data/你的录像.avi`，并关闭不使用的相机。该路径相对项目根目录 `heros/`，
+对应 `heros/data/你的录像.avi`。视频输入会自动读取视频实际宽高，
+不使用 YAML 的 `width`、`height`。焦距、主点和畸变参数仍由 YAML 提供，因此录像分辨率应当
+与这套内参标定时的分辨率一致。然后启动：
 
 ```bash
 ros2 launch camera_driver camera_driver.launch.py \
-  config_file:=/你的本地路径/camera_driver.local.yaml
+  config_file:=/你的本地路径/camera_driver.yaml
 ```
 
 `video_rate_hz: 0.0` 表示按录像记录的 FPS 回放，`video_loop: true` 表示读到末尾后从头循环。
 本地视频只是离线输入，不替代真实相机、时间同步和硬件链路验证。
 
-本地回放没有串口颜色状态时，将 `armor_detector.yaml` 中的 `target_color` 改为 `-2`，使检测器不过滤模型输出颜色。
+本地回放时，将 `gimbal_driver.yaml` 的 `port_name` 改为 `virtual`，虚拟云台会持续发布零 yaw、零 pitch 的状态。
+它的默认模式为普通模式、己方颜色为蓝色；检测器 `target_color: -1` 会据此自动筛选红色目标。运行中可直接切换：
+
+```bash
+ros2 param set /gimbal_driver_node virtual_mode 4
+ros2 param set /gimbal_driver_node virtual_robot_color 1
+```
+
+`virtual_mode` 取值为 `1` 普通、`2` 反陀螺、`3` 自瞄、`4` 反基地；`virtual_robot_color` 中 `0` 为蓝色、`1` 为红色。
+真实车端必须保留实际设备名，例如 `/dev/ttyACM0`；设备打开失败会使节点启动失败，不会自动进入虚拟模式。
+若不希望按颜色筛选，仍可将 `armor_detector.yaml` 的 `target_color` 改为 `-2`。
+
+## 一键启动当前系统
+
+在 `heros/` 目录执行：
+
+```bash
+./run.sh
+```
+
+脚本会直接启动目前已迁移的 `gimbal_driver`、`hero_tf`、`camera_driver`、`camera_router`、`armor_detector`，以及 `foxglove_bridge`；不额外使用总启动功能包。
+该命令不覆盖任何参数，全部行为以各功能包 `config/` 目录中的 YAML 为准：车上使用串口和大恒相机；需要本地回放时再由你把对应 YAML 改为视频源。
+运行后在 Foxglove Desktop 中连接 `ws://localhost:8765`，即可查看话题和 TF。若此前已手动启动 Bridge，应先停止它，避免端口 `8765` 冲突。

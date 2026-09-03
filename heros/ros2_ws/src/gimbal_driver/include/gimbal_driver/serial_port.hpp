@@ -25,9 +25,10 @@ public:
   SerialPort();
   ~SerialPort();
 
-  bool start(const std::string & port_name, int baud_rate, bool verify_crc, bool allow_virtual_serial);
+  bool start(const std::string & port_name, int baud_rate, bool verify_crc);
   void stop();
   bool write(const LegacyWriteCommand & command);
+  bool isVirtual() const;
   void setReadCallback(ReadCallback callback);
   void setErrorCallback(ErrorCallback callback);
 

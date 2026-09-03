@@ -22,18 +22,18 @@ SerialPort::~SerialPort()
 }
 
 //主程序入口
-bool SerialPort::start(
-  const std::string & port_name, int baud_rate, bool verify_crc, bool allow_virtual_serial)
+bool SerialPort::start(const std::string & port_name, int baud_rate, bool verify_crc)
 {
   verify_crc_ = verify_crc;
+  virtual_serial_ = port_name == "virtual";
+  if (virtual_serial_) {
+    return true;
+  }
+
   std::string error_message;
-  // 打开串口失败时，只允许离线测试使用虚拟串口继续启动。
   if (!open(port_name, baud_rate, error_message)) {
-    virtual_serial_ = allow_virtual_serial;
-    if (!virtual_serial_) {
-      reportError(error_message);
-    }
-    return virtual_serial_;
+    reportError(error_message);
+    return false;
   }
 
   running_.store(true);
@@ -73,6 +73,11 @@ bool SerialPort::write(const LegacyWriteCommand & command)
     reportError("串口写入云台控制命令失败：" + error.message());
   }
   return !error;
+}
+
+bool SerialPort::isVirtual() const
+{
+  return virtual_serial_;
 }
 
 void SerialPort::setReadCallback(ReadCallback callback)

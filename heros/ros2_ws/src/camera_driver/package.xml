@@ -6,6 +6,7 @@
   <maintainer email="hero@robomaster.local">Hero algorithm group</maintainer>
   <license>MIT</license>
   <buildtool_depend>ament_cmake</buildtool_depend>
+  <depend>ament_index_cpp</depend>
   <depend>rclcpp</depend>
   <depend>sensor_msgs</depend>
   <depend>opencv</depend>

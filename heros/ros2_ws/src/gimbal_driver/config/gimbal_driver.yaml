@@ -1,11 +1,15 @@
 gimbal_driver_node:
   ros__parameters:
-    port_name: /dev/ttyACM0
+    # 车上填写真实串口 /dev/ttyACM0；本地运行时改为 virtual
+    port_name: virtual
     baud_rate: 115200
     enable_crc_check: true
-    allow_virtual_serial: true
     enable_fire: true
     command_flag: 5
+
+    virtual_mode: 1
+    # 己方颜色：0蓝色，1红色
+    virtual_robot_color: 0
     state_topic: /hero/gimbal/state
     control_topic: /hero/gimbal/control
     gimbal_frame_id: gimbal_link

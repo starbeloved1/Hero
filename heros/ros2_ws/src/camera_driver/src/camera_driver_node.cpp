@@ -1,10 +1,12 @@
 #include "camera_driver/camera_driver_node.hpp"
 
 #include <chrono>
+#include <filesystem>
 #include <stdexcept>
 #include <string>
 #include <thread>
 
+#include <ament_index_cpp/get_package_share_directory.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/videoio.hpp>
 #include <sensor_msgs/msg/camera_info.hpp>
@@ -22,6 +24,27 @@ namespace
 rclcpp::QoS highRateQos()
 {
   return rclcpp::QoS(rclcpp::KeepLast(1)).best_effort().durability_volatile();
+}
+
+std::string resolveVideoPath(const std::string & configured_path)
+{
+  if (configured_path.empty()) {
+    throw std::invalid_argument("本地视频路径不能为空");
+  }
+  const std::filesystem::path path(configured_path);
+  if (path.is_absolute()) {
+    return path.string();
+  }
+
+  const std::filesystem::path package_share(
+    ament_index_cpp::get_package_share_directory("camera_driver"));
+  for (auto directory = package_share; !directory.empty(); directory = directory.parent_path()) {
+    const auto candidate = directory / path;
+    if (std::filesystem::exists(candidate)) {
+      return candidate.string();
+    }
+  }
+  return (package_share / path).string();
 }
 
 }  // namespace
@@ -99,21 +122,23 @@ CameraDriverNode::CameraDriverNode()
         throw std::runtime_error(name + std::string(" 相机打开失败：") + error);
       }
     } else {
-      const auto video_path = get_parameter(std::string(name) + ".video_path").as_string();
-      if (video_path.empty()) {
-        throw std::runtime_error(name + std::string(" 本地视频路径不能为空"));
-      }
+      const auto video_path = resolveVideoPath(
+        get_parameter(std::string(name) + ".video_path").as_string());
       if (!stream->video.open(video_path)) {
         throw std::runtime_error(name + std::string(" 无法打开本地视频：") + video_path);
       }
       const auto video_width = static_cast<int>(stream->video.get(cv::CAP_PROP_FRAME_WIDTH));
       const auto video_height = static_cast<int>(stream->video.get(cv::CAP_PROP_FRAME_HEIGHT));
-      if (video_width != config.width || video_height != config.height) {
-        throw std::runtime_error(
-                name + std::string(" 视频分辨率与标定配置不一致：视频为 ") +
-                std::to_string(video_width) + "x" + std::to_string(video_height) + "，配置为 " +
-                std::to_string(config.width) + "x" + std::to_string(config.height));
+      if (video_width <= 0 || video_height <= 0) {
+        throw std::runtime_error(name + std::string(" 本地视频没有有效分辨率"));
       }
+      if (video_width != config.width || video_height != config.height) {
+        RCLCPP_WARN(
+          get_logger(), "%s 视频分辨率为 %dx%d，CameraInfo 宽高将使用视频实际值；"
+          "请确认 YAML 内参对应此分辨率", name, video_width, video_height);
+      }
+      config.width = video_width;
+      config.height = video_height;
       stream->video_loop = get_parameter(std::string(name) + ".video_loop").as_bool();
       const auto configured_rate = get_parameter(std::string(name) + ".video_rate_hz").as_double();
       if (configured_rate < 0.0) {

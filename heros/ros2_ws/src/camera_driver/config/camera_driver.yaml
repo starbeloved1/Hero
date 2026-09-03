@@ -1,14 +1,16 @@
 camera_driver_node:
   ros__parameters:
     aim8mm.enabled: true
-    aim8mm.source: daheng
+    aim8mm.source: video
     aim8mm.serial_number: FDN23020228
-    aim8mm.video_path: ""
+    # 视频统一放在 heros/data 时，填写 data/文件名.avi 或 data/文件名.mp4。
+    aim8mm.video_path: "data/test.mp4"
     aim8mm.video_loop: true
     aim8mm.video_rate_hz: 0.0
     aim8mm.frame_id: camera_optical_frame
     aim8mm.image_topic: /hero/camera/aim8mm/image_raw
     aim8mm.camera_info_topic: /hero/camera/aim8mm/camera_info
+    # 仅大恒输入使用；视频输入自动读取视频实际分辨率。
     aim8mm.width: 1280
     aim8mm.height: 1024
     aim8mm.exposure_time_us: 4000.0
@@ -23,7 +25,7 @@ camera_driver_node:
     aim8mm.p2: -0.003398452875
     aim8mm.k3: 1.297430667513
     
-    base.enabled: true
+    base.enabled: false
     base.source: daheng
     base.serial_number: FGK26010037
     base.video_path: ""
@@ -32,6 +34,7 @@ camera_driver_node:
     base.frame_id: base_camera_optical_frame
     base.image_topic: /hero/camera/base/image_raw
     base.camera_info_topic: /hero/camera/base/camera_info
+    # 仅大恒输入使用；视频输入自动读取视频实际分辨率。
     base.width: 1280
     base.height: 1024
     base.exposure_time_us: 12000.0

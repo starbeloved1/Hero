@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cmath>
 #include <stdexcept>
+#include <utility>
 
 namespace gimbal_driver
 {
@@ -46,9 +47,10 @@ GimbalDriverNode::GimbalDriverNode()
   declare_parameter<std::string>("port_name", "/dev/ttyACM0");
   declare_parameter<int>("baud_rate", 115200);
   declare_parameter<bool>("enable_crc_check", true);
-  declare_parameter<bool>("allow_virtual_serial", false);
   declare_parameter<bool>("enable_fire", false);
   declare_parameter<int>("command_flag", 0x05);
+  declare_parameter<int>("virtual_mode", 1);
+  declare_parameter<int>("virtual_robot_color", 0);
   declare_parameter<std::string>("state_topic", "/hero/gimbal/state");
   declare_parameter<std::string>("control_topic", "/hero/gimbal/control");
   declare_parameter<std::string>("gimbal_frame_id", "gimbal_link");
@@ -67,6 +69,12 @@ GimbalDriverNode::GimbalDriverNode()
   enable_fire_ = get_parameter("enable_fire").as_bool();
   command_flag_ = static_cast<uint8_t>(command_flag);
   gimbal_frame_id_ = get_parameter("gimbal_frame_id").as_string();
+  if (!virtual_state_.setMode(get_parameter("virtual_mode").as_int())) {
+    throw std::invalid_argument("virtual_mode 必须是 1 到 4");
+  }
+  if (!virtual_state_.setRobotColor(get_parameter("virtual_robot_color").as_int())) {
+    throw std::invalid_argument("virtual_robot_color 必须是 0 或 1");
+  }
 
   //pub&sub
   state_pub_ = create_publisher<hero_msgs::msg::GimbalState>(
@@ -83,17 +91,22 @@ GimbalDriverNode::GimbalDriverNode()
 
   if (!serial_port_->start(
       get_parameter("port_name").as_string(), get_parameter("baud_rate").as_int(),
-      get_parameter("enable_crc_check").as_bool(),
-      get_parameter("allow_virtual_serial").as_bool()))
+      get_parameter("enable_crc_check").as_bool()))
   {
     throw std::runtime_error("串口驱动启动失败");
   }
+  virtual_serial_ = serial_port_->isVirtual();
+  parameter_callback_handle_ = add_on_set_parameters_callback(
+    [this](const std::vector<rclcpp::Parameter> & parameters) {
+      return handleParameters(parameters);
+    });
 
   //创建state与command定时发布器
   state_timer_ = create_wall_timer(periodFromRateHz(state_rate), [this]() {publishState();});
   command_timer_ = create_wall_timer(periodFromRateHz(command_rate), [this]() {sendCommand();});
   RCLCPP_INFO(
-    get_logger(), "Hero serial driver ready; fire output is %s", enable_fire_ ? "enabled" : "disabled");
+    get_logger(), "云台串口驱动已启动：%s，开火输出%s",
+    virtual_serial_ ? "虚拟串口" : "真实串口", enable_fire_ ? "已启用" : "未启用");
 }
 
 GimbalDriverNode::~GimbalDriverNode()
@@ -117,6 +130,16 @@ void GimbalDriverNode::receiveState(const LegacyReadFrame & frame)
 
 void GimbalDriverNode::publishState()
 {
+  if (virtual_serial_) {
+    LegacyReadFrame frame;
+    {
+      std::lock_guard<std::mutex> lock(virtual_state_mutex_);
+      frame = virtual_state_.frame();
+    }
+    publishState(frame, now(), 0);
+    return;
+  }
+
   std::optional<CachedState> state;
   {
     std::lock_guard<std::mutex> lock(state_mutex_);
@@ -129,19 +152,62 @@ void GimbalDriverNode::publishState()
   if (!state.has_value()) {
     return;
   }
+  publishState(state->frame, state->stamp, state->exposure_step);
+}
+
+void GimbalDriverNode::publishState(
+  const LegacyReadFrame & frame, const rclcpp::Time & stamp, int8_t exposure_step)
+{
   hero_msgs::msg::GimbalState message;
-  message.header.stamp = state->stamp;
+  message.header.stamp = stamp;
   message.header.frame_id = gimbal_frame_id_;
-  message.yaw = static_cast<float>(state->frame.yaw_deg * kDegreesToRadians);
-  message.pitch = static_cast<float>(state->frame.pitch_deg * kDegreesToRadians);
-  message.mode = toMode(state->frame.mode_flag);
-  message.raw_mode_flag = state->frame.mode_flag;
-  message.robot_color = state->frame.robot_color;
-  message.right_clicked = state->frame.right_clicked;
-  message.up = state->frame.up;
-  message.down = state->frame.down;
-  message.exposure_step = state->exposure_step;
+  message.yaw = static_cast<float>(frame.yaw_deg * kDegreesToRadians);
+  message.pitch = static_cast<float>(frame.pitch_deg * kDegreesToRadians);
+  message.mode = toMode(frame.mode_flag);
+  message.raw_mode_flag = frame.mode_flag;
+  message.robot_color = frame.robot_color;
+  message.right_clicked = frame.right_clicked;
+  message.up = frame.up;
+  message.down = frame.down;
+  message.exposure_step = exposure_step;
   state_pub_->publish(message);
+}
+
+rcl_interfaces::msg::SetParametersResult GimbalDriverNode::handleParameters(
+  const std::vector<rclcpp::Parameter> & parameters)
+{
+  rcl_interfaces::msg::SetParametersResult result;
+  result.successful = true;
+  if (!virtual_serial_) {
+    for (const auto & parameter : parameters) {
+      if (parameter.get_name() == "virtual_mode" || parameter.get_name() == "virtual_robot_color") {
+        result.successful = false;
+        result.reason = "只有 port_name 为 virtual 时才能修改虚拟状态";
+        return result;
+      }
+    }
+    return result;
+  }
+
+  std::lock_guard<std::mutex> lock(virtual_state_mutex_);
+  auto next_state = virtual_state_;
+  for (const auto & parameter : parameters) {
+    if (parameter.get_name() == "virtual_mode" && !next_state.setMode(parameter.as_int())) {
+      result.successful = false;
+      result.reason = "virtual_mode 必须是 1 到 4";
+      return result;
+    }
+    if (
+      parameter.get_name() == "virtual_robot_color" &&
+      !next_state.setRobotColor(parameter.as_int()))
+    {
+      result.successful = false;
+      result.reason = "virtual_robot_color 必须是 0 或 1";
+      return result;
+    }
+  }
+  virtual_state_ = next_state;
+  return result;
 }
 
 void GimbalDriverNode::receiveCommand(const hero_msgs::msg::ControlCommand & message)
