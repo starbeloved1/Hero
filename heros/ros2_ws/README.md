@@ -10,13 +10,16 @@
 - Node 只承担通信和硬件适配；算法将保持为可测试、无 ROS 依赖的 C++ 库。
 - 高频状态和控制话题使用深度为 1 的 best-effort QoS，只处理最新数据，不积压旧数据。
 
-构建当前工作区：
+构建当前工作区时，推荐在 `heros/` 目录执行：
 
 ```bash
-cd Hero/heros/ros2_ws
-source /opt/ros/humble/setup.bash
-colcon build --symlink-install
-source install/setup.bash
+./build.sh
+```
+
+脚本会自动加载 ROS 2，并定位本机用户目录下的 OpenVINO C++ 环境。也可向它透传普通 colcon 参数，例如只构建检测器：
+
+```bash
+./build.sh --packages-select armor_detector
 ```
 
 当前已迁移的功能包：
@@ -80,3 +83,8 @@ ros2 param set /gimbal_driver_node virtual_robot_color 1
 脚本会直接启动目前已迁移的 `gimbal_driver`、`hero_tf`、`camera_driver`、`camera_router`、`armor_detector`，以及 `foxglove_bridge`；不额外使用总启动功能包。
 该命令不覆盖任何参数，全部行为以各功能包 `config/` 目录中的 YAML 为准：车上使用串口和大恒相机；需要本地回放时再由你把对应 YAML 改为视频源。
 运行后在 Foxglove Desktop 中连接 `ws://localhost:8765`，即可查看话题和 TF。若此前已手动启动 Bridge，应先停止它，避免端口 `8765` 冲突。
+
+## 检测可视化
+
+在 Foxglove 新建 **Image** 面板并选择 `/hero/detector/visualization`，可直接查看主 8 mm 或当前选中相机画面上的装甲板四角、编号、颜色和置信度。
+该图是调试专用副本：原始 `/hero/camera/selected/image_raw` 与结构化检测结果 `/hero/detector/armors` 不会被修改。默认最多发布 10 Hz，且只有 Image 面板订阅该话题时才复制、绘制和发布图像；实战或性能测试时可将 `visualization_enabled` 设为 `false`。

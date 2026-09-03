@@ -28,10 +28,15 @@ target_compile_features(armor_detector PUBLIC cxx_std_17)
 target_include_directories(armor_detector PUBLIC include)
 target_link_libraries(armor_detector PUBLIC armor_utils openvino::runtime ${OpenCV_LIBS})
 
+add_library(armor_visualizer src/armor_visualizer.cpp)
+target_compile_features(armor_visualizer PUBLIC cxx_std_17)
+target_include_directories(armor_visualizer PUBLIC include)
+target_link_libraries(armor_visualizer PUBLIC ${OpenCV_LIBS})
+
 add_executable(armor_detector_node src/main.cpp src/armor_detector_node.cpp)
 target_compile_features(armor_detector_node PUBLIC cxx_std_17)
 target_include_directories(armor_detector_node PRIVATE include)
-target_link_libraries(armor_detector_node armor_detector)
+target_link_libraries(armor_detector_node armor_detector armor_visualizer)
 ament_target_dependencies(armor_detector_node
   ament_index_cpp
   cv_bridge
@@ -45,9 +50,12 @@ if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
   ament_add_gtest(test_armor_utils test/test_armor_utils.cpp)
   target_link_libraries(test_armor_utils armor_utils)
+  ament_add_gtest(test_armor_visualizer test/test_armor_visualizer.cpp)
+  target_link_libraries(test_armor_visualizer armor_visualizer)
+  target_include_directories(test_armor_visualizer PRIVATE include)
 endif()
 
-install(TARGETS armor_utils armor_detector armor_detector_node
+install(TARGETS armor_utils armor_detector armor_visualizer armor_detector_node
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME}

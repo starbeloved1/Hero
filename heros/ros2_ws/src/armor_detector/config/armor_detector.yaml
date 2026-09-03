@@ -4,10 +4,14 @@ armor_detector_node:
     gimbal_state_topic: /hero/gimbal/state
     armor_topic: /hero/detector/armors
 
+    visualization_enabled: true
+    visualization_topic: /hero/detector/visualization
+    visualization_rate_hz: 10.0
+
     model_path: model/0526.onnx
     inference_device: GPU
     confidence_threshold: 0.75
     nms_threshold: 0.45
 
     # -1自动选择敌方；-2不按颜色过滤；0/1固定敌方颜色。0=蓝色，1=红色
-    target_color: -1
+    target_color: -2

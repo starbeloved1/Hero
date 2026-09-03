@@ -1,0 +1,4 @@
+# 在 heros/ 根目录误执行 colcon 后生成的构建产物。
+/build/
+/install/
+/log/
