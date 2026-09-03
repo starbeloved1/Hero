@@ -5,7 +5,7 @@
 ## 约定
 
 - 新功能包使用职责名，不加 `hero_` 前缀；`hero_msgs` 是公共消息包的固定例外。英雄机器人话题统一位于 `/hero` 命名空间下。
-- ROS 边界的角度使用弧度、距离使用米，时间戳表示数据采集时刻。
+- ROS 边界的角度使用弧度、距离使用米；测量消息的时间戳表示数据采集时刻，控制命令的时间戳表示命令生成或仲裁输出时刻。
 - 串口仍保持旧协议的角度制和字节布局，只有 `gimbal_driver` 可以在串口协议与 ROS 消息间转换。
 - Node 只承担通信和硬件适配；算法将保持为可测试、无 ROS 依赖的 C++ 库。
 - 高频状态和控制话题使用深度为 1 的 best-effort QoS，只处理最新数据，不积压旧数据。
@@ -31,6 +31,7 @@
 - `camera_driver`：通过大恒 SDK 或本地视频发布相机图像与标定参数。
 - `armor_detector`：使用 0526 OpenVINO 模型输出装甲板二维四角点、编号、颜色和置信度。
 - `armor_solver`：根据装甲板四角点和 `CameraInfo` 执行 PnP，输出三维装甲板位姿。
+- `command_mux`：按云台模式仲裁策略候选命令，并独占发布 `/hero/gimbal/control`；缺少有效候选时保持当前角度且禁止开火。
 
 启动已完成的云台通信与坐标系部分：
 
@@ -81,7 +82,7 @@ ros2 param set /gimbal_driver_node virtual_robot_color 1
 ./run.sh
 ```
 
-脚本会直接启动目前已迁移的 `gimbal_driver`、`hero_tf`、`camera_driver`、`camera_router`、`armor_detector`、`armor_solver`，以及 `foxglove_bridge`；不额外使用总启动功能包。
+脚本会直接启动目前已迁移的 `gimbal_driver`、`hero_tf`、`camera_driver`、`camera_router`、`armor_detector`、`armor_solver`、`command_mux`，以及 `foxglove_bridge`；不额外使用总启动功能包。
 该命令不覆盖任何参数，全部行为以各功能包 `config/` 目录中的 YAML 为准：车上使用串口和大恒相机；需要本地回放时再由你把对应 YAML 改为视频源。
 运行后在 Foxglove Desktop 中连接 `ws://localhost:8765`，即可查看话题和 TF。若此前已手动启动 Bridge，应先停止它，避免端口 `8765` 冲突。
 

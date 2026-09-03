@@ -10,6 +10,7 @@ gimbal_driver_node:
     virtual_mode: 1
     # 己方颜色：0蓝色，1红色
     virtual_robot_color: 0
+    
     state_topic: /hero/gimbal/state
     control_topic: /hero/gimbal/control
     gimbal_frame_id: gimbal_link

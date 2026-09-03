@@ -1,0 +1,15 @@
+command_mux_node:
+  ros__parameters:
+    gimbal_state_topic: /hero/gimbal/state
+    # 此节点是唯一允许发布该 topic 的节点。
+    control_topic: /hero/gimbal/control
+
+    # 四种模式的策略候选输入。尚未迁移的策略不会发布，因此会触发安全保持命令。
+    normal_control_topic: /hero/normal_aim/control_candidate
+    anti_top_control_topic: /hero/anti_top/control_candidate
+    auto_aim_control_topic: /hero/auto_aim/control_candidate
+    anti_base_control_topic: /hero/anti_base/control_candidate
+
+    output_rate_hz: 200.0
+    # 候选命令超过该年龄后不再转发，改为保持当前角度并禁止开火。
+    max_command_age_sec: 0.1

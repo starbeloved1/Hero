@@ -21,6 +21,7 @@
 | `camera_driver` | 已完成 SDK 与本地视频后端 | 每路可通过 YAML 的 `source` 选择 `daheng` 或 `video`。大恒模式严格按 SN 打开主 8 mm 与基地相机，Bayer 图像转换为 `bgr8`；视频模式通过 OpenCV 回放本地文件。两种输入均按同一 YAML 内参和 topic 发布给 `camera_router`。已完成构建、输入源单元测试与本地视频发布验证，待真实相机接入验证。 |
 | `armor_detector` | 已完成第一版 | 迁移旧 `ArmorOneStage` 的 OpenVINO 0526 模型推理、颜色筛选、类别映射、NMS 与二维四角点输出。订阅 `/hero/camera/selected/image_raw`，发布 `/hero/detector/armors`（`ArmorArray`）；Foxglove 订阅时按限频发布 `/hero/detector/visualization` 调试图。0526 模型统一放在 `heros/model/0526.onnx`；已完成构建、纯逻辑单测和模型加载启动验证，待录像端到端验证。 |
 | `armor_solver` | 已完成 PnP 第一版 | 订阅 `/hero/detector/armors` 和 `/hero/camera/selected/camera_info`，将四个二维角点用 IPPE PnP 解算为 `ArmorPoseArray`，发布 `/hero/solver/armor_poses`。默认按检测时间戳查 TF 并输出 `world`；查不到同刻 TF 时降级为相机光学坐标系输出。Foxglove 订阅时发布 `/hero/solver/markers`。已完成合成角点单元测试，待正确标定录像与真实相机端到端验证。 |
+| `command_mux` | 已完成第一版 | 唯一发布 `/hero/gimbal/control` 的安全仲裁节点。订阅云台 mode 和四种策略候选控制 topic；只转发当前 mode 对应且未超过 `max_command_age_sec` 的候选命令。无候选或候选过期时，以当前云台角度输出禁止开火的保持命令。普通、反陀螺、自瞄、反基地策略尚待迁移，因此当前系统始终处于安全保持。 |
 
 ## 坐标系与标定决定
 
@@ -53,9 +54,10 @@
 - `heros/run.sh` 是当前已迁移功能包的一键入口。脚本直接依次启动 `gimbal_driver`、`hero_tf`、`camera_driver`、`camera_router`、`armor_detector`、`armor_solver` 与 `foxglove_bridge`，不使用额外的 `bringup` 功能包，也不覆盖任何 YAML 参数。是否读取视频、相机与串口参数均由各包 YAML 决定；Foxglove Desktop 连接 `ws://localhost:8765` 即可观察系统。
 - 已在无真实相机的开发机上验证过已迁移节点的组合启动；因当前 YAML 选择大恒相机且开发机未接相机，`camera_driver` 正确报告“未发现大恒相机”并退出。上车前应确认相机序列号和串口设备名。`gimbal_driver` 的虚拟模式已完成构建、单元测试和 ROS 话题验证：默认发布普通模式/蓝色，动态切换到反基地/红色后由 `camera_router` 正确切到基地相机。
 - 后续优化项：在完整链路和实时正确性验证后，评估将相机采集、相机路由和装甲板检测放入组件容器并使用进程内通信，以及将检测器改为 OpenVINO 双请求异步流水线。当前迁移阶段不为此重构，优先补齐完整功能链路。
-- 多模式控制决定：模式唯一来源为 `/hero/gimbal/state` 的 `GimbalState.mode`。模式切换不重启节点；各策略发布各自的候选控制指令，后续由唯一的 `command_mux` 按 mode 选择并独占发布 `/hero/gimbal/control`，避免多发布者交错控制云台。
+- 可视化与性能调优的优先级：当前只保留支撑功能验证所需的基础 Foxglove 话题和调试图；完整链路写完并能端到端运行后，再统一完善 Foxglove 布局、频率与延迟统计、性能测量和参数调优，避免在迁移中途为局部观测反复重构。
+- 多模式控制决定：模式唯一来源为 `/hero/gimbal/state` 的 `GimbalState.mode`。模式切换不重启节点；各策略发布各自的候选控制指令，`command_mux` 按 mode 选择并独占发布 `/hero/gimbal/control`，避免多发布者交错控制云台。候选命令必须将 `ControlCommand.header.stamp` 设置为策略生成命令的时刻；仲裁器只接受未超过 `max_command_age_sec` 的候选命令。
 - 下一步使用下载的本地视频核对 `/hero/detector/armors` 与 `/hero/solver/armor_poses` 的时间戳、相机坐标系、编号、颜色、角点、PnP 深度和重投影误差；录像分辨率与内参不一致时，不得相信三维数值。随后迁移普通/反陀螺策略与追踪预测模块。在上车前仍须验证两台真实相机的设备发现、SN 匹配、图像话题、时间戳和路由切换。
-- 后续迁移顺序：相机采集 → 检测 → PnP/解算 → 普通/反陀螺控制 → 追踪预测 → 反基地与 MQTT → 全系统 launch、rosbag 回归、部署验证。
+- 后续迁移顺序：相机采集 → 检测 → PnP/解算 → 控制仲裁 → 普通/反陀螺控制 → 追踪预测 → 反基地与 MQTT → 全系统 launch、rosbag 回归、部署验证。
 
 ## 已验证命令
 
