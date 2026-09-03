@@ -30,6 +30,7 @@
 - `camera_router`：按云台模式选择主 8mm 或基地相机的图像与相机内参。
 - `camera_driver`：通过大恒 SDK 或本地视频发布相机图像与标定参数。
 - `armor_detector`：使用 0526 OpenVINO 模型输出装甲板二维四角点、编号、颜色和置信度。
+- `armor_solver`：根据装甲板四角点和 `CameraInfo` 执行 PnP，输出三维装甲板位姿。
 
 启动已完成的云台通信与坐标系部分：
 
@@ -80,7 +81,7 @@ ros2 param set /gimbal_driver_node virtual_robot_color 1
 ./run.sh
 ```
 
-脚本会直接启动目前已迁移的 `gimbal_driver`、`hero_tf`、`camera_driver`、`camera_router`、`armor_detector`，以及 `foxglove_bridge`；不额外使用总启动功能包。
+脚本会直接启动目前已迁移的 `gimbal_driver`、`hero_tf`、`camera_driver`、`camera_router`、`armor_detector`、`armor_solver`，以及 `foxglove_bridge`；不额外使用总启动功能包。
 该命令不覆盖任何参数，全部行为以各功能包 `config/` 目录中的 YAML 为准：车上使用串口和大恒相机；需要本地回放时再由你把对应 YAML 改为视频源。
 运行后在 Foxglove Desktop 中连接 `ws://localhost:8765`，即可查看话题和 TF。若此前已手动启动 Bridge，应先停止它，避免端口 `8765` 冲突。
 
@@ -88,3 +89,5 @@ ros2 param set /gimbal_driver_node virtual_robot_color 1
 
 在 Foxglove 新建 **Image** 面板并选择 `/hero/detector/visualization`，可直接查看主 8 mm 或当前选中相机画面上的装甲板四角、编号、颜色和置信度。
 该图是调试专用副本：原始 `/hero/camera/selected/image_raw` 与结构化检测结果 `/hero/detector/armors` 不会被修改。默认最多发布 10 Hz，且只有 Image 面板订阅该话题时才复制、绘制和发布图像；实战或性能测试时可将 `visualization_enabled` 设为 `false`。
+
+在 Foxglove 新建 **3D** 面板并选择 `/hero/solver/markers`，可查看 PnP 后位于 `world` 坐标系的三维装甲板。结构化位姿数据位于 `/hero/solver/armor_poses`，其中 `reprojection_error` 越小表示该帧二维角点与 PnP 结果越一致。录像分辨率与内参不一致时，Marker 只能用于检查链路，不可视为真实空间位置。

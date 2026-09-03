@@ -4,6 +4,7 @@ armor_detector_node:
     gimbal_state_topic: /hero/gimbal/state
     armor_topic: /hero/detector/armors
 
+    # 可视化选择
     visualization_enabled: true
     visualization_topic: /hero/detector/visualization
     visualization_rate_hz: 10.0

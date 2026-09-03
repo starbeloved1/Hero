@@ -4,7 +4,7 @@
 
 ## 命名
 
-- 新功能包采用英文职责名，不加 `hero_` 前缀，例如 `camera_driver`、`camera_router`、`armor_detector`、`solver`、`tracker`、`controller`。
+- 新功能包采用英文职责名，不加 `hero_` 前缀，例如 `camera_driver`、`camera_router`、`armor_detector`、`armor_solver`、`tracker`、`controller`。
 - `hero_msgs` 是公共自定义消息包，固定保留原名。
 - ROS 话题统一位于 `/hero/...` 命名空间；消息字段、参数、坐标系、C++ 标识符均使用英文。
 - 包内文件采用 `snake_case`，不加 `hero_` 前缀。例如 `main.cpp`、`camera_router_node.cpp`、`camera_router.yaml`、`camera_router.launch.py`。

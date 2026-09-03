@@ -11,6 +11,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/ControlCommand.msg"
   "msg/Armor.msg"
   "msg/ArmorArray.msg"
+  "msg/ArmorPose.msg"
+  "msg/ArmorPoseArray.msg"
   DEPENDENCIES geometry_msgs std_msgs
 )
 

@@ -1,0 +1,13 @@
+armor_solver_node:
+  ros__parameters:
+    armor_topic: /hero/detector/armors
+    camera_info_topic: /hero/camera/selected/camera_info
+    armor_pose_topic: /hero/solver/armor_poses
+
+    # 通过TF转到world坐标系
+    target_frame_id: world
+    tf_lookup_timeout_sec: 0.05
+
+    # 装甲板3D可视化
+    visualization_enabled: true
+    visualization_topic: /hero/solver/markers

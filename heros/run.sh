@@ -36,6 +36,9 @@ pids+=("$!")
 ros2 launch armor_detector armor_detector.launch.py &
 pids+=("$!")
 
+ros2 launch armor_solver armor_solver.launch.py &
+pids+=("$!")
+
 ros2 launch foxglove_bridge foxglove_bridge_launch.xml &
 pids+=("$!")
 
