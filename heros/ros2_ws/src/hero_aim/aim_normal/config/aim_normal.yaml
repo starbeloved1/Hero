@@ -1,0 +1,24 @@
+aim_normal_node:
+  ros__parameters:
+    # 先完成录像和实车标定验证，再显式开启候选输出和开火。
+    enabled: false
+    enable_fire: false
+
+    armor_pose_topic: /hero/solver/armor_poses
+    gimbal_state_topic: /hero/gimbal/state
+    control_candidate_topic: /hero/aim/normalaim/controller
+    debug_topic: /hero/aim/normalaim/debug
+    target_frame_id: world
+
+    # 与旧 NormalAim 的同编号连续目标距离阈值一致。
+    keep_target_distance_m: 0.3
+    # 旧工程最多保持 20 帧；当前默认 0，避免丢失目标后继续瞄准。
+    max_lost_frames: 0
+
+    # 旧大装甲板俯仰距离会除以此值。
+    large_armor_distance_factor: 1.2
+    # 迁移旧 BasicAimer：小角度连续变化才平滑，超过阈值立即跟随。
+    yaw_previous_weight: 0.3
+    pitch_previous_weight: 0.7
+    yaw_jump_threshold_deg: 3.0
+    pitch_jump_threshold_deg: 1.0

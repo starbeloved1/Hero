@@ -8,9 +8,9 @@ namespace command_mux
 enum class CommandSource : std::uint8_t
 {
   kNone,
-  kNormalAim,
+  kNormal,
   kAntiTop,
-  kAutoAim,
+  kAuto,
   kAntiBase,
 };
 
@@ -19,5 +19,8 @@ CommandSource sourceForMode(std::uint8_t mode);
 
 // 候选命令的时间戳必须不晚于当前时刻，且年龄不超过上限。
 bool isFresh(double command_time_sec, double now_sec, double max_age_sec);
+
+// 仅允许当前模式对应的独立入口通过。
+bool sourceMatchesMode(CommandSource source, std::uint8_t mode);
 
 }  // command_mux

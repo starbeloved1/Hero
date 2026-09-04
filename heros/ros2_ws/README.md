@@ -9,6 +9,7 @@
 - 串口仍保持旧协议的角度制和字节布局，只有 `gimbal_driver` 可以在串口协议与 ROS 消息间转换。
 - Node 只承担通信和硬件适配；算法将保持为可测试、无 ROS 依赖的 C++ 库。
 - 高频状态和控制话题使用深度为 1 的 best-effort QoS，只处理最新数据，不积压旧数据。
+- `src/hero_aim/` 是瞄准算法域的源码分组，内部的 `aim_core`、`aim_normal` 等仍是独立 ROS package；目录分组不改变包名或 topic。
 
 构建当前工作区时，推荐在 `heros/` 目录执行：
 
@@ -24,14 +25,18 @@
 
 当前已迁移的功能包：
 
-- `hero_msgs`：云台状态与控制命令的公共消息定义。
+- `hero_msgs`：云台状态、控制命令、装甲板检测/位姿和策略调试信息的公共消息定义。
 - `gimbal_driver`：旧串口协议、CRC、云台状态发布与控制命令下发。
 - `hero_tf`：云台姿态驱动的动态坐标变换，以及相机标定得到的静态坐标变换。
 - `camera_router`：按云台模式选择主 8mm 或基地相机的图像与相机内参。
 - `camera_driver`：通过大恒 SDK 或本地视频发布相机图像与标定参数。
 - `armor_detector`：使用 0526 OpenVINO 模型输出装甲板二维四角点、编号、颜色和置信度。
 - `armor_solver`：根据装甲板四角点和 `CameraInfo` 执行 PnP，输出三维装甲板位姿。
-- `command_mux`：按云台模式仲裁策略候选命令，并独占发布 `/hero/gimbal/control`；缺少有效候选时保持当前角度且禁止开火。
+- `aim_core`：无 ROS 依赖的瞄准核心库，提供弹道求解、角度连续化和角度平滑。
+- `aim_normal`：mode 1 普通瞄准，完成连续目标选择、弹道、角度平滑，并向 `/hero/aim/normalaim/controller` 发布候选控制。
+- `command_mux`：按云台模式仲裁四个独立候选入口，并独占发布 `/hero/gimbal/control`。无候选、候选过期或模式切换时保持当前角度且禁止开火。
+
+`aim_core/config/ballistics.yaml` 保存所有瞄准策略共用的弹速、阻力、重力、弹丸尺寸/质量、枪口偏移和迭代次数。每个策略的 launch 都应先加载此文件，再加载自身 YAML；策略自身只保存目标选择、控制、话题和安全开关等差异参数。
 
 相机驱动的原始 topic 按物理来源命名，例如 `aim8mm`、`base`；它们的 `frame_id` 同样带来源前缀。`camera_router` 输出的 `/hero/camera/selected/*` 则是后续算法唯一使用的逻辑相机接口，统一使用 `camera_optical_frame`，并保留原始采集时间戳。
 
@@ -84,9 +89,11 @@ ros2 param set /gimbal_driver_node virtual_robot_color 1
 ./run.sh
 ```
 
-脚本会直接启动目前已迁移的 `gimbal_driver`、`hero_tf`、`camera_driver`、`camera_router`、`armor_detector`、`armor_solver`、`command_mux`，以及 `foxglove_bridge`；不额外使用总启动功能包。
+脚本会直接启动目前已迁移的 `gimbal_driver`、`hero_tf`、`camera_driver`、`camera_router`、`armor_detector`、`armor_solver`、`aim_normal`、`command_mux`，以及 `foxglove_bridge`；不额外使用总启动功能包。
 该命令不覆盖任何参数，全部行为以各功能包 `config/` 目录中的 YAML 为准：车上使用串口和大恒相机；需要本地回放时再由你把对应 YAML 改为视频源。
 运行后在 Foxglove Desktop 中连接 `ws://localhost:8765`，即可查看话题和 TF。若此前已手动启动 Bridge，应先停止它，避免端口 `8765` 冲突。
+
+`aim_normal` 默认只计算与发布 `/hero/aim/normalaim/debug` 调试量，不发布候选、更不会开火；这是为当前录像、内参与实车弹道尚未完成统一验证设置的安全默认值。验证完成后在 `aim_normal.yaml` 中把 `enabled` 设为 `true` 才会向仲裁器提供控制候选，`enable_fire` 需要单独显式设为 `true`。Foxglove 的 **Raw Messages** 或 **Plot** 面板可查看其目标点、原始/平滑 yaw、pitch、飞行时间与开火状态。
 
 ## 检测可视化
 
