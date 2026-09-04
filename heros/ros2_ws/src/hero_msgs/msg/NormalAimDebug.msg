@@ -1,4 +1,4 @@
-# 普通模式瞄准过程调试信息。header 表示参与本次决策的装甲板测量时刻。
+# 普通模式瞄准过程调试信息，header 表示参与本次决策的装甲板测量时刻
 std_msgs/Header header
 bool valid
 bool held_target

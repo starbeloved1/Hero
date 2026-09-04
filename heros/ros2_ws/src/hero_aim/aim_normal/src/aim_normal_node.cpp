@@ -21,6 +21,7 @@ rclcpp::QoS highRateQos()
 AimNormalNode::AimNormalNode()
 : Node("aim_normal_node"), aimer_(NormalAimerConfig{})
 {
+  // 节点参数
   declare_parameter<bool>("enabled", false);
   declare_parameter<bool>("enable_fire", false);
   declare_parameter<std::string>("armor_pose_topic", "/hero/solver/armor_poses");
@@ -31,14 +32,15 @@ AimNormalNode::AimNormalNode()
   declare_parameter<double>("keep_target_distance_m", 0.3);
   declare_parameter<int>("max_lost_frames", 0);
   declare_parameter<double>("large_armor_distance_factor", 1.2);
-  declare_parameter<double>("bullet_speed_mps", 11.6);
-  declare_parameter<double>("drag_coefficient", 0.29);
-  declare_parameter<double>("gravity_mps2", 9.794);
-  declare_parameter<double>("air_density_kgpm3", 1.169);
-  declare_parameter<double>("bullet_mass_kg", 0.041);
-  declare_parameter<double>("bullet_radius_m", 0.02125);
-  declare_parameter<double>("muzzle_offset_m", 0.28);
-  declare_parameter<int>("ballistic_iteration_count", 10);
+  // 公共弹道参数没有 C++ 兜底值；必须由 aim_core/config/ballistics.yaml 提供。
+  declare_parameter("bullet_speed_mps", rclcpp::ParameterType::PARAMETER_DOUBLE);
+  declare_parameter("drag_coefficient", rclcpp::ParameterType::PARAMETER_DOUBLE);
+  declare_parameter("gravity_mps2", rclcpp::ParameterType::PARAMETER_DOUBLE);
+  declare_parameter("air_density_kgpm3", rclcpp::ParameterType::PARAMETER_DOUBLE);
+  declare_parameter("bullet_mass_kg", rclcpp::ParameterType::PARAMETER_DOUBLE);
+  declare_parameter("bullet_radius_m", rclcpp::ParameterType::PARAMETER_DOUBLE);
+  declare_parameter("muzzle_offset_m", rclcpp::ParameterType::PARAMETER_DOUBLE);
+  declare_parameter("ballistic_iteration_count", rclcpp::ParameterType::PARAMETER_INTEGER);
   declare_parameter<double>("yaw_previous_weight", 0.3);
   declare_parameter<double>("pitch_previous_weight", 0.7);
   declare_parameter<double>("yaw_jump_threshold_deg", 3.0);
@@ -52,7 +54,6 @@ AimNormalNode::AimNormalNode()
   if (max_lost_frames < 0 || ballistic_iteration_count <= 0) {
     throw std::invalid_argument("普通瞄准策略的整数参数无效");
   }
-
   constexpr double kDegreesToRadians = 0.017453292519943295;
   NormalAimerConfig config;
   config.keep_target_distance_m = get_parameter("keep_target_distance_m").as_double();
@@ -73,7 +74,6 @@ AimNormalNode::AimNormalNode()
   config.smoother.pitch_jump_threshold_rad =
     get_parameter("pitch_jump_threshold_deg").as_double() * kDegreesToRadians;
   aimer_ = NormalAimer(config);
-
   const auto armor_pose_topic = get_parameter("armor_pose_topic").as_string();
   const auto gimbal_state_topic = get_parameter("gimbal_state_topic").as_string();
   const auto control_candidate_topic = get_parameter("control_candidate_topic").as_string();
@@ -113,6 +113,7 @@ void AimNormalNode::receiveGimbalState(const hero_msgs::msg::GimbalState::ConstS
   latest_gimbal_state_ = *message;
 }
 
+//每收到一次ArmorPoses就发布debug与command
 void AimNormalNode::receiveArmorPoses(const hero_msgs::msg::ArmorPoseArray::ConstSharedPtr & message)
 {
   if (

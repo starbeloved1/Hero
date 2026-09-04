@@ -7,7 +7,7 @@ armor_detector_node:
     # 可视化选择
     visualization_enabled: true
     visualization_topic: /hero/detector/visualization
-    visualization_rate_hz: 10.0
+    visualization_rate_hz: 30.0
 
     model_path: model/0526.onnx
     inference_device: GPU

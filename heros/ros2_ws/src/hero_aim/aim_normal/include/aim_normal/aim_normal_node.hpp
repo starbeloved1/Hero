@@ -14,7 +14,7 @@
 namespace aim_normal
 {
 
-// 普通模式策略迁移旧 NormalAim：选目标、解弹道、平滑角度并发布控制候选。
+// nomalaim主流水线：选目标、解弹道、平滑角度并发布控制候选
 class AimNormalNode : public rclcpp::Node
 {
 public:

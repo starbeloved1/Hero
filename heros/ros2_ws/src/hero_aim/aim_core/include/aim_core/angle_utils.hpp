@@ -3,10 +3,10 @@
 namespace aim_core
 {
 
-// 将角度规范到 [-pi, pi)。
+//归一化角度
 double normalizeRadians(double angle_rad);
 
-// 返回与 reference_rad 最连续的 equivalent_rad 的等价角。
+//改写目标yaw为最接近当前yaw等价角度
 double unwrapNear(double angle_rad, double reference_rad);
 
 struct AimAngles
@@ -23,14 +23,14 @@ struct AngleSmootherConfig
   double pitch_jump_threshold_rad{0.017453292519943295};
 };
 
-// 迁移旧 BasicAimer 的角度连续化与小跳变低通滤波；输入输出均为弧度。
 class AngleSmoother
 {
 public:
   explicit AngleSmoother(AngleSmootherConfig config = {});
 
+  //保存上一次控制角度，做平滑或者跟随策略
   AimAngles filter(double yaw_rad, double pitch_rad);
-  void reset();
+  void reset(); //右键上升沿或者离开mode时调用
 
 private:
   AngleSmootherConfig config_;

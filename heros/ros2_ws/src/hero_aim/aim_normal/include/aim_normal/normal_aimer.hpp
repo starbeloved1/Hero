@@ -30,12 +30,13 @@ struct NormalAimResult
   double flight_time_sec{0.0};
 };
 
-// 普通模式的纯 C++ 核心：连续目标选择、阻力弹道与角度平滑。
+// normalaim的算法核心：连续目标选择、阻力弹道与角度平滑
 class NormalAimer
 {
 public:
   explicit NormalAimer(NormalAimerConfig config);
 
+  // 调用aim_core中的算法层，输出NormalAimResult
   std::optional<NormalAimResult> aim(
     const std::vector<ArmorObservation> & observations, double gimbal_yaw_rad,
     double gimbal_pitch_rad);
