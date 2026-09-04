@@ -2,6 +2,7 @@
 
 #include <stdexcept>
 #include <string>
+#include <utility>
 
 namespace camera_router
 {
@@ -34,6 +35,7 @@ CameraRouterNode::CameraRouterNode(): Node("camera_router_node")
   declare_parameter<std::string>("base_camera_info_topic", "/hero/camera/base/camera_info");
   declare_parameter<std::string>("selected_image_topic", "/hero/camera/selected/image_raw");
   declare_parameter<std::string>("selected_camera_info_topic", "/hero/camera/selected/camera_info");
+  declare_parameter<std::string>("selected_frame_id", "camera_optical_frame");
 
   const auto gimbal_state_topic = get_parameter("gimbal_state_topic").as_string();
   const auto aim8mm_image_topic = get_parameter("aim8mm_image_topic").as_string();
@@ -42,6 +44,7 @@ CameraRouterNode::CameraRouterNode(): Node("camera_router_node")
   const auto base_camera_info_topic = get_parameter("base_camera_info_topic").as_string();
   const auto selected_image_topic = get_parameter("selected_image_topic").as_string();
   const auto selected_camera_info_topic = get_parameter("selected_camera_info_topic").as_string();
+  selected_frame_id_ = get_parameter("selected_frame_id").as_string();
   validateTopic(gimbal_state_topic, "gimbal_state_topic");
   validateTopic(aim8mm_image_topic, "aim8mm_image_topic");
   validateTopic(aim8mm_camera_info_topic, "aim8mm_camera_info_topic");
@@ -49,6 +52,7 @@ CameraRouterNode::CameraRouterNode(): Node("camera_router_node")
   validateTopic(base_camera_info_topic, "base_camera_info_topic");
   validateTopic(selected_image_topic, "selected_image_topic");
   validateTopic(selected_camera_info_topic, "selected_camera_info_topic");
+  validateTopic(selected_frame_id_, "selected_frame_id");
   base_camera_enabled_ = get_parameter("base_camera_enabled").as_bool();
   
   const auto sensor_qos = highRateQos();
@@ -108,7 +112,10 @@ void CameraRouterNode::forwardImage(
   if (source_profile != active_profile_) {
     return;
   }
-  selected_image_pub_->publish(image);
+  auto selected_image = image;
+  // selected 是供后续算法使用的逻辑相机接口，统一使用当前选中相机坐标系名称。
+  selected_image.header.frame_id = selected_frame_id_;
+  selected_image_pub_->publish(std::move(selected_image));
 }
 
 void CameraRouterNode::forwardCameraInfo(
@@ -117,7 +124,10 @@ void CameraRouterNode::forwardCameraInfo(
   if (source_profile != active_profile_) {
     return;
   }
-  selected_camera_info_pub_->publish(camera_info);
+  auto selected_camera_info = camera_info;
+  // 必须与 selected 图像使用同一 frame_id，时间戳保持物理相机采集时刻不变。
+  selected_camera_info.header.frame_id = selected_frame_id_;
+  selected_camera_info_pub_->publish(std::move(selected_camera_info));
 }
 
 }  // camera_router

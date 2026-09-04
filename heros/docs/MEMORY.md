@@ -35,7 +35,7 @@
 - 输入：`/hero/camera/aim8mm/{image_raw,camera_info}` 与 `/hero/camera/base/{image_raw,camera_info}`。
 - 输出：`/hero/camera/selected/{image_raw,camera_info}`。
 - `MODE_ANTI_BASE`（模式 4）且 `base_camera_enabled: true` 时选择基地相机；其余模式选择主 8 mm。
-- 路由器不修改 `Image` 或 `CameraInfo` 的 `header.stamp`、`header.frame_id`。
+- 物理相机原始话题使用带来源前缀的 frame，例如 `aim8mm_camera_optical_frame`、`base_camera_optical_frame`。路由器保持 `header.stamp` 不变，但会将 selected 图像与内参的 `header.frame_id` 统一改为逻辑相机坐标系 `camera_optical_frame`；后续算法只消费 selected 接口，不关心物理相机名称。
 - 主 8 mm 内参来自旧 `init.json`；基地相机旧配置没有内参，因此当前 `CameraInfo` 的标定数组为零，不能用于基地相机 PnP，获得标定后必须补齐。
 
 ## 颜色与检测接口决定

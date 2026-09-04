@@ -11,8 +11,8 @@ gimbal_driver_node:
     # 己方颜色：0蓝色，1红色
     virtual_robot_color: 0
     
-    state_topic: /hero/gimbal/state
-    control_topic: /hero/gimbal/control
+    state_topic: /hero/gimbal/state # pub
+    control_topic: /hero/gimbal/control # sub
     gimbal_frame_id: gimbal_link
     state_publish_rate_hz: 200.0
     command_send_rate_hz: 200.0

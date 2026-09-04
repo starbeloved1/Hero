@@ -1,7 +1,7 @@
 camera_router_node:
   ros__parameters:
     gimbal_state_topic: /hero/gimbal/state
-    base_camera_enabled: true
+    base_camera_enabled: true # 如果置false，selected会只发布aim8mm内容
 
     aim8mm_image_topic: /hero/camera/aim8mm/image_raw
     aim8mm_camera_info_topic: /hero/camera/aim8mm/camera_info
@@ -10,3 +10,5 @@ camera_router_node:
 
     selected_image_topic: /hero/camera/selected/image_raw
     selected_camera_info_topic: /hero/camera/selected/camera_info
+    # selected 是后续算法唯一使用的逻辑相机接口
+    selected_frame_id: camera_optical_frame

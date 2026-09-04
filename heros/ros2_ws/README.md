@@ -33,6 +33,8 @@
 - `armor_solver`：根据装甲板四角点和 `CameraInfo` 执行 PnP，输出三维装甲板位姿。
 - `command_mux`：按云台模式仲裁策略候选命令，并独占发布 `/hero/gimbal/control`；缺少有效候选时保持当前角度且禁止开火。
 
+相机驱动的原始 topic 按物理来源命名，例如 `aim8mm`、`base`；它们的 `frame_id` 同样带来源前缀。`camera_router` 输出的 `/hero/camera/selected/*` 则是后续算法唯一使用的逻辑相机接口，统一使用 `camera_optical_frame`，并保留原始采集时间戳。
+
 启动已完成的云台通信与坐标系部分：
 
 ```bash

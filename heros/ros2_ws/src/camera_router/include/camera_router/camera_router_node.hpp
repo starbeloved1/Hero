@@ -26,6 +26,7 @@ private:
 
   bool base_camera_enabled_{true};
   CameraProfile active_profile_{CameraProfile::kAim8mm};
+  std::string selected_frame_id_;
   rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr selected_image_pub_;
   rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr selected_camera_info_pub_;
   rclcpp::Subscription<hero_msgs::msg::GimbalState>::SharedPtr gimbal_state_sub_;
