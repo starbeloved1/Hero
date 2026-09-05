@@ -47,7 +47,7 @@ struct PredictedArmor
   double yaw_rad{0.0};
 };
 
-// 整车完整预测状态
+// 发布的整车完整预测状态
 struct TargetEstimate
 {
   std::uint8_t id{0U};

@@ -213,6 +213,12 @@ void ArmorSolverNode::receiveArmors(const hero_msgs::msg::ArmorArray::ConstShare
     hero_msgs::msg::ArmorPose pose;
     pose.header = message->header;
     pose.pose = poseFromEstimate(estimate);
+    for (const auto & corner : armor.corners) {
+      pose.image_center.x += corner.x;
+      pose.image_center.y += corner.y;
+    }
+    pose.image_center.x /= static_cast<float>(armor.corners.size());
+    pose.image_center.y /= static_cast<float>(armor.corners.size());
     pose.id = armor.id;
     pose.color = armor.color;
     pose.confidence = armor.confidence;

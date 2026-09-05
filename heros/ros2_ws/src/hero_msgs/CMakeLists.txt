@@ -18,6 +18,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/TargetStateArray.msg"
   "msg/AutoAimDebug.msg"
   "msg/NormalAimDebug.msg"
+  "msg/AntitopDebug.msg"
   DEPENDENCIES builtin_interfaces geometry_msgs std_msgs
 )
 

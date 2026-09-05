@@ -9,7 +9,7 @@
 - 串口仍保持旧协议的角度制和字节布局，只有 `gimbal_driver` 可以在串口协议与 ROS 消息间转换。
 - Node 只承担通信和硬件适配；算法将保持为可测试、无 ROS 依赖的 C++ 库。
 - 高频状态和控制话题使用深度为 1 的 best-effort QoS，只处理最新数据，不积压旧数据。
-- `src/hero_aim/` 是瞄准算法域的源码分组，内部的 `aim_core`、`aim_normal`、`aim_predictor`、`aim_auto` 等仍是独立 ROS package；目录分组不改变包名或 topic。
+- `src/hero_aim/` 是瞄准算法域的源码分组，内部的 `aim_core`、`aim_normal`、`aim_antitop`、`aim_predictor`、`aim_auto` 等仍是独立 ROS package；目录分组不改变包名或 topic。
 
 构建当前工作区时，推荐在 `heros/` 目录执行：
 
@@ -36,6 +36,7 @@
 - `aim_normal`：mode 1 普通瞄准，完成连续目标选择、弹道、角度平滑，并向 `/hero/aim/normalaim/controller` 发布候选控制。
 - `aim_predictor`：mode 3 自瞄预测，维护每个目标车的四装甲板 EKF 状态，并向 `/hero/aim/autoaim/target_states` 发布预测结果；不直接控制云台。
 - `aim_auto`：mode 3 自瞄控制，锁定目标车、预测命中时刻的装甲板、求弹道并向 `/hero/aim/autoaim/controller` 发布候选；`/hero/aim/autoaim/debug` 用于查看选择与开火门。
+- `aim_antitop`：mode 2 反前哨。连续选择前哨板、拟合 XY 旋转中心、标定三层 Z 高度；利用同刻 TF 与 `CameraInfo` 的内参、畸变参数，将旋转中心重投影回原始图像，完成方向识别、射击区域、周期统计和倒计时开火。候选发布到 `/hero/aim/antitop/controller`，过程量发布到 `/hero/aim/antitop/debug`；默认禁用且不开火。
 - `command_mux`：按云台模式仲裁四个独立候选入口，并独占发布 `/hero/gimbal/control`。无候选、候选过期或模式切换时保持当前角度且禁止开火。
 
 `aim_core/config/ballistics.yaml` 保存所有瞄准策略共用的弹速、阻力、重力、弹丸尺寸/质量、枪口偏移和迭代次数。每个策略的 launch 都应先加载此文件，再加载自身 YAML；策略自身只保存目标选择、控制、话题和安全开关等差异参数。
@@ -91,7 +92,7 @@ ros2 param set /gimbal_driver_node virtual_robot_color 1
 ./run.sh
 ```
 
-脚本会直接启动目前已迁移的 `gimbal_driver`、`hero_tf`、`camera_driver`、`camera_router`、`armor_detector`、`armor_solver`、`aim_predictor`、`aim_auto`、`aim_normal`、`command_mux`，以及 `foxglove_bridge`；不额外使用总启动功能包。
+脚本会直接启动目前已迁移的 `gimbal_driver`、`hero_tf`、`camera_driver`、`camera_router`、`armor_detector`、`armor_solver`、`aim_predictor`、`aim_auto`、`aim_normal`、`aim_antitop`、`command_mux`，以及 `foxglove_bridge`；不额外使用总启动功能包。
 该命令不覆盖任何参数，全部行为以各功能包 `config/` 目录中的 YAML 为准：车上使用串口和大恒相机；需要本地回放时再由你把对应 YAML 改为视频源。
 运行后在 Foxglove Desktop 中连接 `ws://localhost:8765`，即可查看话题和 TF。若此前已手动启动 Bridge，应先停止它，避免端口 `8765` 冲突。
 

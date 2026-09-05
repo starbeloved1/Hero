@@ -65,6 +65,9 @@ pids+=("$!")
 ros2 launch aim_normal aim_normal.launch.py &
 pids+=("$!")
 
+ros2 launch aim_antitop aim_antitop.launch.py &
+pids+=("$!")
+
 ros2 launch command_mux command_mux.launch.py &
 pids+=("$!")
 

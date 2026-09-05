@@ -1,0 +1,48 @@
+aim_antitop_node:
+  ros__parameters:
+    # enable 开关
+    enabled: false
+    enable_fire: false
+
+    armor_pose_topic: /hero/solver/armor_poses # sub
+    gimbal_state_topic: /hero/gimbal/state # sub
+    # 用 selected 的原始图像内参和畸变，将世界旋转中心重投影到同一像素平面。
+    camera_info_topic: /hero/camera/selected/camera_info # sub
+    control_candidate_topic: /hero/aim/antitop/controller # pub
+    debug_topic: /hero/aim/antitop/debug # pub
+    target_frame_id: world
+
+    # 仅选择前哨站
+    outpost_armor_id: 7
+
+    # 最大保存数据量
+    center_window_size: 300
+    minimum_center_samples: 10
+
+    # 三层 Z 标定参数
+    calibration_start_center_samples: 40
+    calibration_min_samples: 240
+    calibration_max_samples: 360
+    minimum_layer_samples: 12
+    z_histogram_bin_size_m: 0.01
+    z_calibration_match_threshold_m: 0.05
+    z_layer_gap_min_m: 0.08
+    z_layer_gap_max_m: 0.12
+
+    # 二维连续性和旋转方向；数值保持旧 AntiTop 的像素语义。
+    max_pixel_jump_px: 20.0
+    direction_window_size: 10
+    direction_threshold_px: 0.0002
+
+    # 射击区域、转动周期与倒计时；默认 enable_fire 为 false，不会实际开火。
+    minimum_center_samples_for_zone: 80
+    enter_zone_threshold_px: 25.0
+    exit_zone_threshold_px: 35.0
+    recent_z_window_size: 20
+    z_runtime_match_threshold_m: 0.05
+    minimum_period_sec: 0.5
+    maximum_period_sec: 1.0
+    maximum_period_history_size: 20
+    system_delay_sec: 0.05
+    clockwise_time_bias_sec: 0.0
+    counterclockwise_time_bias_sec: 0.0
