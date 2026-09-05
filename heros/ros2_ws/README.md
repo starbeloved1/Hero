@@ -9,7 +9,7 @@
 - 串口仍保持旧协议的角度制和字节布局，只有 `gimbal_driver` 可以在串口协议与 ROS 消息间转换。
 - Node 只承担通信和硬件适配；算法将保持为可测试、无 ROS 依赖的 C++ 库。
 - 高频状态和控制话题使用深度为 1 的 best-effort QoS，只处理最新数据，不积压旧数据。
-- `src/hero_aim/` 是瞄准算法域的源码分组，内部的 `aim_core`、`aim_normal` 等仍是独立 ROS package；目录分组不改变包名或 topic。
+- `src/hero_aim/` 是瞄准算法域的源码分组，内部的 `aim_core`、`aim_normal`、`aim_predictor`、`aim_auto` 等仍是独立 ROS package；目录分组不改变包名或 topic。
 
 构建当前工作区时，推荐在 `heros/` 目录执行：
 
@@ -34,6 +34,8 @@
 - `armor_solver`：根据装甲板四角点和 `CameraInfo` 执行 PnP，输出三维装甲板位姿。
 - `aim_core`：无 ROS 依赖的瞄准核心库，提供弹道求解、角度连续化和角度平滑。
 - `aim_normal`：mode 1 普通瞄准，完成连续目标选择、弹道、角度平滑，并向 `/hero/aim/normalaim/controller` 发布候选控制。
+- `aim_predictor`：mode 3 自瞄预测，维护每个目标车的四装甲板 EKF 状态，并向 `/hero/aim/autoaim/target_states` 发布预测结果；不直接控制云台。
+- `aim_auto`：mode 3 自瞄控制，锁定目标车、预测命中时刻的装甲板、求弹道并向 `/hero/aim/autoaim/controller` 发布候选；`/hero/aim/autoaim/debug` 用于查看选择与开火门。
 - `command_mux`：按云台模式仲裁四个独立候选入口，并独占发布 `/hero/gimbal/control`。无候选、候选过期或模式切换时保持当前角度且禁止开火。
 
 `aim_core/config/ballistics.yaml` 保存所有瞄准策略共用的弹速、阻力、重力、弹丸尺寸/质量、枪口偏移和迭代次数。每个策略的 launch 都应先加载此文件，再加载自身 YAML；策略自身只保存目标选择、控制、话题和安全开关等差异参数。
@@ -89,11 +91,13 @@ ros2 param set /gimbal_driver_node virtual_robot_color 1
 ./run.sh
 ```
 
-脚本会直接启动目前已迁移的 `gimbal_driver`、`hero_tf`、`camera_driver`、`camera_router`、`armor_detector`、`armor_solver`、`aim_normal`、`command_mux`，以及 `foxglove_bridge`；不额外使用总启动功能包。
+脚本会直接启动目前已迁移的 `gimbal_driver`、`hero_tf`、`camera_driver`、`camera_router`、`armor_detector`、`armor_solver`、`aim_predictor`、`aim_auto`、`aim_normal`、`command_mux`，以及 `foxglove_bridge`；不额外使用总启动功能包。
 该命令不覆盖任何参数，全部行为以各功能包 `config/` 目录中的 YAML 为准：车上使用串口和大恒相机；需要本地回放时再由你把对应 YAML 改为视频源。
 运行后在 Foxglove Desktop 中连接 `ws://localhost:8765`，即可查看话题和 TF。若此前已手动启动 Bridge，应先停止它，避免端口 `8765` 冲突。
 
 `aim_normal` 默认只计算与发布 `/hero/aim/normalaim/debug` 调试量，不发布候选、更不会开火；这是为当前录像、内参与实车弹道尚未完成统一验证设置的安全默认值。验证完成后在 `aim_normal.yaml` 中把 `enabled` 设为 `true` 才会向仲裁器提供控制候选，`enable_fire` 需要单独显式设为 `true`。Foxglove 的 **Raw Messages** 或 **Plot** 面板可查看其目标点、原始/平滑 yaw、pitch、飞行时间与开火状态。
+
+mode 3 的 `aim_predictor` 与 `aim_auto` 默认会在模式 3 下计算、发布预测状态和控制候选，但 `aim_auto.enable_fire: false`，因此候选命令的 `shoot_status` 固定为 0。`TargetStateArray.header.stamp` 是预测状态时刻 `Tstate`，新增的 `measurement_stamp` 是原始图像时刻 `T0`；预测器已经完成 `T0 → Tstate` 的外推。Foxglove 中优先观察 `/hero/aim/autoaim/target_states` 与 `/hero/aim/autoaim/debug`，后者会显示目标锁定、选中面板、命中时刻、弹道、相位、云台误差及每道开火门。
 
 ## 检测可视化
 

@@ -16,8 +16,3 @@ aim_normal_node:
 
     # 大装甲板俯仰距离补偿
     large_armor_distance_factor: 1.2
-    # 小角度连续变化启用平滑，超过阈值立即跟随
-    yaw_previous_weight: 0.3
-    pitch_previous_weight: 0.7
-    yaw_jump_threshold_deg: 3.0
-    pitch_jump_threshold_deg: 1.0

@@ -1,0 +1,7 @@
+/**:
+  ros__parameters:
+    # 所有 mode 公用的角度平滑滤波参数
+    yaw_previous_weight: 0.3
+    pitch_previous_weight: 0.7
+    yaw_jump_threshold_deg: 3.0
+    pitch_jump_threshold_deg: 1.0

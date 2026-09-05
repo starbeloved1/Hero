@@ -56,6 +56,12 @@ pids+=("$!")
 ros2 launch armor_solver armor_solver.launch.py &
 pids+=("$!")
 
+ros2 launch aim_predictor aim_predictor.launch.py &
+pids+=("$!")
+
+ros2 launch aim_auto aim_auto.launch.py &
+pids+=("$!")
+
 ros2 launch aim_normal aim_normal.launch.py &
 pids+=("$!")
 

@@ -41,10 +41,11 @@ AimNormalNode::AimNormalNode()
   declare_parameter("bullet_radius_m", rclcpp::ParameterType::PARAMETER_DOUBLE);
   declare_parameter("muzzle_offset_m", rclcpp::ParameterType::PARAMETER_DOUBLE);
   declare_parameter("ballistic_iteration_count", rclcpp::ParameterType::PARAMETER_INTEGER);
-  declare_parameter<double>("yaw_previous_weight", 0.3);
-  declare_parameter<double>("pitch_previous_weight", 0.7);
-  declare_parameter<double>("yaw_jump_threshold_deg", 3.0);
-  declare_parameter<double>("pitch_jump_threshold_deg", 1.0);
+  // 公共平滑参数必须由 aim_core/config/angle_smoother.yaml 提供。
+  declare_parameter("yaw_previous_weight", rclcpp::ParameterType::PARAMETER_DOUBLE);
+  declare_parameter("pitch_previous_weight", rclcpp::ParameterType::PARAMETER_DOUBLE);
+  declare_parameter("yaw_jump_threshold_deg", rclcpp::ParameterType::PARAMETER_DOUBLE);
+  declare_parameter("pitch_jump_threshold_deg", rclcpp::ParameterType::PARAMETER_DOUBLE);
 
   enabled_ = get_parameter("enabled").as_bool();
   enable_fire_ = get_parameter("enable_fire").as_bool();

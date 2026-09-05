@@ -1,0 +1,27 @@
+aim_auto_node:
+  ros__parameters:
+    # enable 开关
+    enabled: true
+    enable_fire: false
+
+    target_state_topic: /hero/aim/autoaim/target_states # sub
+    gimbal_state_topic: /hero/gimbal/state # sub
+    control_candidate_topic: /hero/aim/autoaim/controller # pub
+    debug_topic: /hero/aim/autoaim/debug # pub
+    target_frame_id: world
+
+    system_response_time_sec: 0.05 # 云台相应延时
+    high_spin_threshold_radps: 2.0 # 高速模式阈值
+    coming_angle_deg: 60.0
+    leaving_angle_deg: 40.0
+
+    # 开火条件
+    shoot_yaw_tolerance_deg: 2.0
+    shoot_pitch_tolerance_deg: 2.0
+    fire_confirm_frames: 4
+    fast_fire_confirm_frames: 2
+
+    # 高加速度保护
+    high_acceleration_threshold_mps2: 0.5
+    stable_acceleration_threshold_mps2: 0.05
+    acceleration_stable_frames: 5

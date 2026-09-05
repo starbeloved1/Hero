@@ -8,7 +8,7 @@ namespace aim_core
 
 struct BallisticConfig
 {
-  // 所有真实数值必须由 aim_core/config/ballistics.yaml 提供；NaN 表示尚未配置。
+  // 所有真实数值必须由 aim_core/config/ballistics.yaml 提供
   double bullet_speed_mps{std::numeric_limits<double>::quiet_NaN()};
   double drag_coefficient{std::numeric_limits<double>::quiet_NaN()};
   double gravity_mps2{std::numeric_limits<double>::quiet_NaN()};
