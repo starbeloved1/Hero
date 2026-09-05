@@ -53,6 +53,11 @@ TEST(AutoAimer, UsesSameArmorForYawAndPitch)
   const auto result = aimer.aim({makeTarget(1U, 4.0)}, 1.0, 1.0, 0.0, 0.0);
   ASSERT_TRUE(result.has_value());
   EXPECT_NEAR(result->raw_yaw_rad, std::atan2(result->aim_point_m.y(), result->aim_point_m.x()), 1e-6);
+  ASSERT_EQ(result->predicted_armors.size(), 4U);
+  const auto & selected = result->predicted_armors[static_cast<std::size_t>(result->armor_index)];
+  EXPECT_NEAR(selected.position_m.x(), result->aim_point_m.x(), 1e-6);
+  EXPECT_NEAR(selected.position_m.y(), result->aim_point_m.y(), 1e-6);
+  EXPECT_NEAR(selected.position_m.z(), result->aim_point_m.z(), 1e-6);
 }
 
 TEST(AutoAimer, HighAccelerationBlocksFire)

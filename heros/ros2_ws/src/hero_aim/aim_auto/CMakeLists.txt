@@ -10,6 +10,7 @@ find_package(aim_core REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(hero_msgs REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(visualization_msgs REQUIRED)
 
 add_library(aim_auto_core src/auto_aimer.cpp)
 target_compile_features(aim_auto_core PUBLIC cxx_std_17)
@@ -23,7 +24,7 @@ add_executable(aim_auto_node src/main.cpp src/aim_auto_node.cpp)
 target_compile_features(aim_auto_node PUBLIC cxx_std_17)
 target_include_directories(aim_auto_node PRIVATE include)
 target_link_libraries(aim_auto_node aim_auto_core)
-ament_target_dependencies(aim_auto_node aim_core hero_msgs rclcpp)
+ament_target_dependencies(aim_auto_node aim_core hero_msgs rclcpp visualization_msgs)
 
 install(TARGETS aim_auto_core aim_auto_node
   ARCHIVE DESTINATION lib

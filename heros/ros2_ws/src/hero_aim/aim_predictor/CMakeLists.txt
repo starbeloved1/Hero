@@ -12,6 +12,7 @@ find_package(hero_msgs REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
+find_package(visualization_msgs REQUIRED)
 
 add_library(target_tracker src/target_tracker.cpp)
 target_compile_features(target_tracker PUBLIC cxx_std_17)
@@ -25,7 +26,7 @@ add_executable(aim_predictor_node src/main.cpp src/aim_predictor_node.cpp)
 target_compile_features(aim_predictor_node PUBLIC cxx_std_17)
 target_include_directories(aim_predictor_node PRIVATE include)
 target_link_libraries(aim_predictor_node target_tracker)
-ament_target_dependencies(aim_predictor_node geometry_msgs hero_msgs rclcpp tf2 tf2_ros)
+ament_target_dependencies(aim_predictor_node geometry_msgs hero_msgs rclcpp tf2 tf2_ros visualization_msgs)
 
 install(TARGETS target_tracker aim_predictor_node
   ARCHIVE DESTINATION lib

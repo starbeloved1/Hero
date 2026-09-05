@@ -99,9 +99,13 @@ ros2 param set /gimbal_driver_node virtual_robot_color 1
 
 mode 3 的 `aim_predictor` 与 `aim_auto` 默认会在模式 3 下计算、发布预测状态和控制候选，但 `aim_auto.enable_fire: false`，因此候选命令的 `shoot_status` 固定为 0。`TargetStateArray.header.stamp` 是预测状态时刻 `Tstate`，新增的 `measurement_stamp` 是原始图像时刻 `T0`；预测器已经完成 `T0 → Tstate` 的外推。Foxglove 中优先观察 `/hero/aim/autoaim/target_states` 与 `/hero/aim/autoaim/debug`，后者会显示目标锁定、选中面板、命中时刻、弹道、相位、云台误差及每道开火门。
 
+在 Foxglove 新建 **3D** 面板并选择 `/hero/aim/autoaim/predictor/markers`，可同时查看 Predictor 的四板模型与本帧实际 PnP 观测：青色方块为每台已跟踪车辆在 `Tstate` 的四块预测装甲板，红色箭头为板指向车辆中心的内向方向；黄色方块和橙色箭头为 `T0` 的实际观测。该话题只有 3D 面板订阅时才发布，便于检查四板模型是否跳错板、半径是否发散或朝向是否颠倒。
+
+另一个 3D 话题 `/hero/aim/autoaim/controller/markers` 用于检查控制决策：紫蓝方块和粉色箭头表示**已锁定的一台车**在预计命中时刻 `Taim` 的四块装甲板及其内向方向；绿色方块是最终选中的装甲板，洋红色球是用于解弹道的 `aim_point`。建议先为 Predictor 和 Controller 分别建立两个 3D 面板；若叠加到同一面板，会同时出现 `T0`、`Tstate`、`Taim` 三个时刻的数据，信息较多但便于分析整段预测链路。
+
 ## 检测可视化
 
 在 Foxglove 新建 **Image** 面板并选择 `/hero/detector/visualization`，可直接查看主 8 mm 或当前选中相机画面上的装甲板四角、编号、颜色和置信度。
-该图是调试专用副本：原始 `/hero/camera/selected/image_raw` 与结构化检测结果 `/hero/detector/armors` 不会被修改。默认最多发布 10 Hz，且只有 Image 面板订阅该话题时才复制、绘制和发布图像；实战或性能测试时可将 `visualization_enabled` 设为 `false`。
+该图是调试专用副本：原始 `/hero/camera/selected/image_raw` 与结构化检测结果 `/hero/detector/armors` 不会被修改。发布上限由 `visualization_rate_hz` 配置，且只有 Image 面板订阅该话题时才复制、绘制和发布图像；实战或性能测试时可将 `visualization_enabled` 设为 `false`。
 
 在 Foxglove 新建 **3D** 面板并选择 `/hero/solver/markers`，可查看 PnP 后位于 `world` 坐标系的三维装甲板。结构化位姿数据位于 `/hero/solver/armor_poses`，其中 `reprojection_error` 越小表示该帧二维角点与 PnP 结果越一致。录像分辨率与内参不一致时，Marker 只能用于检查链路，不可视为真实空间位置。

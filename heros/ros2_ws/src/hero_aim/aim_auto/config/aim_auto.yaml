@@ -8,6 +8,8 @@ aim_auto_node:
     gimbal_state_topic: /hero/gimbal/state # sub
     control_candidate_topic: /hero/aim/autoaim/controller # pub
     debug_topic: /hero/aim/autoaim/debug # pub
+    visualization_enabled: true
+    visualization_topic: /hero/aim/autoaim/controller/markers
     target_frame_id: world
 
     system_response_time_sec: 0.05 # 云台相应延时

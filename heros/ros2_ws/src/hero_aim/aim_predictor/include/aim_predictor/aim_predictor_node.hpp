@@ -11,37 +11,47 @@
 #include <rclcpp/rclcpp.hpp>
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
+#include <visualization_msgs/msg/marker_array.hpp>
 
 #include "aim_predictor/target_tracker.hpp"
 
-namespace aim_predictor
-{
+namespace aim_predictor {
 
 // autoaim 预测节点：由装甲板测量维护目标车状态，不输出云台控制命令
-class AimPredictorNode : public rclcpp::Node
-{
+class AimPredictorNode : public rclcpp::Node {
 public:
   AimPredictorNode();
 
 private:
-  using MeasurementsById = std::map<std::uint8_t, std::vector<ArmorMeasurement>>;
+  using MeasurementsById =
+      std::map<std::uint8_t, std::vector<ArmorMeasurement>>;
 
-  void receiveGimbalState(const hero_msgs::msg::GimbalState::ConstSharedPtr & message);
+  void receiveGimbalState(
+      const hero_msgs::msg::GimbalState::ConstSharedPtr &message);
   // autoaim 主入口
-  void receiveArmorPoses(const hero_msgs::msg::ArmorPoseArray::ConstSharedPtr & message);
+  void receiveArmorPoses(
+      const hero_msgs::msg::ArmorPoseArray::ConstSharedPtr &message);
   // 工具函数，两者一起查询可见装甲板外法向量（朝向相机）
-  [[nodiscard]] MeasurementsById collectMeasurements(
-    const hero_msgs::msg::ArmorPoseArray & message);
-  [[nodiscard]] std::optional<Eigen::Vector3d> lookupCameraPosition(
-    const std_msgs::msg::Header & measurement_header);
+  [[nodiscard]] MeasurementsById
+  collectMeasurements(const hero_msgs::msg::ArmorPoseArray &message);
+  [[nodiscard]] std::optional<Eigen::Vector3d>
+  lookupCameraPosition(const std_msgs::msg::Header &measurement_header);
   // update
-  void updateTrackers(const MeasurementsById & measurements, double stamp_sec);
-  void publishStates(const std_msgs::msg::Header & measurement_header);
+  void updateTrackers(const MeasurementsById &measurements, double stamp_sec);
+  void publishStates(const std_msgs::msg::Header &measurement_header,
+                     const MeasurementsById &measurements);
+  void publishVisualization(const hero_msgs::msg::TargetStateArray &states,
+                            const MeasurementsById &measurements);
   void reset();
 
-  rclcpp::Subscription<hero_msgs::msg::GimbalState>::SharedPtr gimbal_state_sub_;
-  rclcpp::Subscription<hero_msgs::msg::ArmorPoseArray>::SharedPtr armor_pose_sub_;
-  rclcpp::Publisher<hero_msgs::msg::TargetStateArray>::SharedPtr target_state_pub_;
+  rclcpp::Subscription<hero_msgs::msg::GimbalState>::SharedPtr
+      gimbal_state_sub_;
+  rclcpp::Subscription<hero_msgs::msg::ArmorPoseArray>::SharedPtr
+      armor_pose_sub_;
+  rclcpp::Publisher<hero_msgs::msg::TargetStateArray>::SharedPtr
+      target_state_pub_;
+  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr
+      visualization_pub_;
   std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
 
@@ -54,6 +64,8 @@ private:
   std::string target_frame_id_;
   std::string camera_frame_id_;
   double tf_lookup_timeout_sec_{0.02};
+  int last_predicted_marker_count_{0};
+  int last_measurement_marker_count_{0};
 };
 
-}  // aim_predictor
+} // namespace aim_predictor

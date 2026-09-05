@@ -10,12 +10,10 @@
 #include "aim_core/angle_utils.hpp"
 #include "aim_core/ballistics.hpp"
 
-namespace aim_auto
-{
+namespace aim_auto {
 
 // 对应TargetState
-struct AutoTarget
-{
+struct AutoTarget {
   std::uint8_t id{0U};
   bool tracking{false};
   bool converged{false};
@@ -29,8 +27,7 @@ struct AutoTarget
 };
 
 // 参数
-struct AutoAimConfig
-{
+struct AutoAimConfig {
   aim_core::BallisticConfig ballistics;
   aim_core::AngleSmootherConfig smoother;
   double system_response_time_sec{0.05};
@@ -46,14 +43,22 @@ struct AutoAimConfig
   int acceleration_stable_frames{5};
 };
 
-// 输出结果，会作为ControlCommand与AutoaimDebug的输入
-struct AutoAimResult
-{
+// 单块装甲板在本次控制预计命中时刻的预测结果。
+struct AutoAimArmor {
+  int index{-1};
+  Eigen::Vector3d position_m{Eigen::Vector3d::Zero()};
+  double inward_yaw_rad{0.0};
+  double phase_error_rad{0.0};
+};
+
+// 输出结果，会作为 ControlCommand、AutoAimDebug 与控制可视化的输入。
+struct AutoAimResult {
   bool valid{false};
   bool target_locked{false};
   std::uint8_t target_id{0U};
   int armor_index{-1};
   Eigen::Vector3d aim_point_m{Eigen::Vector3d::Zero()};
+  std::array<AutoAimArmor, 4> predicted_armors{};
   double raw_yaw_rad{0.0};
   double raw_pitch_rad{0.0};
   double command_yaw_rad{0.0};
@@ -72,8 +77,7 @@ struct AutoAimResult
   bool shoot_ready{false};
 };
 
-class AutoAimer
-{
+class AutoAimer {
 public:
   explicit AutoAimer(AutoAimConfig config);
 
@@ -92,26 +96,22 @@ public:
   // 5. smoother_.filter()：对原始弹道 yaw、pitch 做连续化和平滑，得到控制命令角
   // 6. 计算 phase_ready、gimbal_ready，并结合加速度保护更新连续满足帧数
   // 7. 将所有数据打包为 AutoAimResult
-  std::optional<AutoAimResult> aim(
-    const std::vector<AutoTarget> & targets, double state_stamp_sec, double control_stamp_sec,
-    double gimbal_yaw_rad, double gimbal_pitch_rad);
+  std::optional<AutoAimResult>
+  aim(const std::vector<AutoTarget> &targets, double state_stamp_sec,
+      double control_stamp_sec, double gimbal_yaw_rad, double gimbal_pitch_rad);
   void reset(); // reset
 
 private:
-  struct ArmorCandidate
-  {
-    int index{-1};
-    Eigen::Vector3d position_m{Eigen::Vector3d::Zero()};
-    double inward_yaw_rad{0.0};
-    double phase_error_rad{0.0};
-  };
-
   [[nodiscard]] static double normalizeRadians(double angle_rad);
-  [[nodiscard]] static AutoTarget predictTarget(const AutoTarget & target, double delay_sec);
-  [[nodiscard]] static std::array<ArmorCandidate, 4> buildArmors(const AutoTarget & target);
-  [[nodiscard]] std::optional<ArmorCandidate> chooseArmor(const AutoTarget & target) const;
-  [[nodiscard]] const AutoTarget * chooseTarget(const std::vector<AutoTarget> & targets);
-  double updateAcceleration(const AutoTarget & target, double state_stamp_sec);
+  [[nodiscard]] static AutoTarget predictTarget(const AutoTarget &target,
+                                                double delay_sec);
+  [[nodiscard]] static std::array<AutoAimArmor, 4>
+  buildArmors(const AutoTarget &target);
+  [[nodiscard]] std::optional<AutoAimArmor>
+  chooseArmor(const AutoTarget &target) const;
+  [[nodiscard]] const AutoTarget *
+  chooseTarget(const std::vector<AutoTarget> &targets);
+  double updateAcceleration(const AutoTarget &target, double state_stamp_sec);
   bool updateAccelerationSafety(double acceleration_mps2);
 
   AutoAimConfig config_;
@@ -125,4 +125,4 @@ private:
   int fire_ready_count_{0};
 };
 
-}  // aim_auto
+} // namespace aim_auto
