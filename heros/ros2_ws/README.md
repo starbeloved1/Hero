@@ -36,7 +36,7 @@
 - `aim_normal`：mode 1 普通瞄准，完成连续目标选择、弹道、角度平滑，并向 `/hero/aim/normalaim/controller` 发布候选控制。
 - `aim_predictor`：mode 3 自瞄预测，维护每个目标车的四装甲板 EKF 状态，并向 `/hero/aim/autoaim/target_states` 发布预测结果；不直接控制云台。
 - `aim_auto`：mode 3 自瞄控制，锁定目标车、预测命中时刻的装甲板、求弹道并向 `/hero/aim/autoaim/controller` 发布候选；`/hero/aim/autoaim/debug` 用于查看选择与开火门。
-- `aim_antitop`：mode 2 反前哨。连续选择前哨板、拟合 XY 旋转中心、标定三层 Z 高度；利用同刻 TF 与 `CameraInfo` 的内参、畸变参数，将旋转中心重投影回原始图像，完成方向识别、射击区域、周期统计和倒计时开火。候选发布到 `/hero/aim/antitop/controller`，过程量发布到 `/hero/aim/antitop/debug`；默认禁用且不开火。
+- `aim_antitop`：mode 2 反前哨。连续选择前哨板、拟合 XY 旋转中心、标定三层 Z 高度；利用同刻 TF 与 `CameraInfo` 的内参、畸变参数，将旋转中心重投影回原始图像，完成方向识别、射击区域、周期统计和倒计时开火。候选发布到 `/hero/aim/antitop/controller`，过程量发布到 `/hero/aim/antitop/debug`，三维过程量发布到 `/hero/aim/antitop/markers`；默认禁用且不开火。
 - `command_mux`：按云台模式仲裁四个独立候选入口，并独占发布 `/hero/gimbal/control`。无候选、候选过期或模式切换时保持当前角度且禁止开火。
 
 `aim_core/config/ballistics.yaml` 保存所有瞄准策略共用的弹速、阻力、重力、弹丸尺寸/质量、枪口偏移和迭代次数。每个策略的 launch 都应先加载此文件，再加载自身 YAML；策略自身只保存目标选择、控制、话题和安全开关等差异参数。
@@ -103,6 +103,8 @@ mode 3 的 `aim_predictor` 与 `aim_auto` 默认会在模式 3 下计算、发�
 在 Foxglove 新建 **3D** 面板并选择 `/hero/aim/autoaim/predictor/markers`，可同时查看 Predictor 的四板模型与本帧实际 PnP 观测：青色方块为每台已跟踪车辆在 `Tstate` 的四块预测装甲板，红色箭头为板指向车辆中心的内向方向；黄色方块和橙色箭头为 `T0` 的实际观测。该话题只有 3D 面板订阅时才发布，便于检查四板模型是否跳错板、半径是否发散或朝向是否颠倒。
 
 另一个 3D 话题 `/hero/aim/autoaim/controller/markers` 用于检查控制决策：紫蓝方块和粉色箭头表示**已锁定的一台车**在预计命中时刻 `Taim` 的四块装甲板及其内向方向；绿色方块是最终选中的装甲板，洋红色球是用于解弹道的 `aim_point`。建议先为 Predictor 和 Controller 分别建立两个 3D 面板；若叠加到同一面板，会同时出现 `T0`、`Tstate`、`Taim` 三个时刻的数据，信息较多但便于分析整段预测链路。
+
+反前哨可在独立 **3D** 面板选择 `/hero/aim/antitop/markers`。青色球是本帧 `T0` 的连续跟踪前哨板，青色线段表示它相对拟合旋转轴的水平半径；同一相位的蓝色方块和粉色内向箭头是由该观测重建的前哨三层板模型，会随连续帧更新而绕轴转动。完成 Z 标定后，橙色竖线与三个橙色球表示旋转轴和低、中、高三层高度。绿色球是本次控制时刻 `Tcontrol` 实际交给弹道解算的瞄点，即“旋转中心 XY + 当前目标 Z”。旋转中心本身只拟合 XY，故图中不会把 `rotation_center.z = 0` 误画成物理高度。
 
 ## 检测可视化
 

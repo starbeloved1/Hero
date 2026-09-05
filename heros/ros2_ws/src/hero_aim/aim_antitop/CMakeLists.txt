@@ -15,6 +15,7 @@ find_package(sensor_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
+find_package(visualization_msgs REQUIRED)
 
 add_library(aim_antitop_core src/antitop_tracker.cpp src/antitop_aimer.cpp src/antitop_controller.cpp)
 target_compile_features(aim_antitop_core PUBLIC cxx_std_17)
@@ -28,7 +29,7 @@ add_executable(aim_antitop_node src/main.cpp src/aim_antitop_node.cpp)
 target_compile_features(aim_antitop_node PUBLIC cxx_std_17)
 target_include_directories(aim_antitop_node PRIVATE include)
 target_link_libraries(aim_antitop_node aim_antitop_core ${OpenCV_LIBS})
-ament_target_dependencies(aim_antitop_node aim_core hero_msgs rclcpp sensor_msgs tf2 tf2_geometry_msgs tf2_ros)
+ament_target_dependencies(aim_antitop_node aim_core hero_msgs rclcpp sensor_msgs tf2 tf2_geometry_msgs tf2_ros visualization_msgs)
 
 install(TARGETS aim_antitop_core aim_antitop_node
   ARCHIVE DESTINATION lib
