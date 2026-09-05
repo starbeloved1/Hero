@@ -30,11 +30,11 @@ AntitopController::AntitopController(AntitopControllerConfig config)
 
 AntitopControllerResult AntitopController::update(
   const AntitopTrackerState & tracker_state, double center_image_x_px,
-  double flight_time_sec, double control_stamp_sec)
+  double flight_time_sec, double measurement_stamp_sec, double control_stamp_sec)
 {
   if (
     !std::isfinite(center_image_x_px) || !std::isfinite(flight_time_sec) ||
-    !std::isfinite(control_stamp_sec))
+    !std::isfinite(measurement_stamp_sec) || !std::isfinite(control_stamp_sec))
   {
     return makeResult(tracker_state, control_stamp_sec, false);
   }
@@ -55,7 +55,9 @@ AntitopControllerResult AntitopController::update(
   const bool zone_rising = now_in_zone && !in_shoot_zone_;
   if (zone_rising) {
     if (has_last_zone_entry_) {
-      const double period_sec = control_stamp_sec - last_zone_entry_stamp_sec_;
+      // 周期属于目标物理运动，必须在图像采集时间 T0（这里记作 Tzone）上测量，
+      // 不能被检测、PnP 或 ROS 调度延迟污染。
+      const double period_sec = measurement_stamp_sec - last_zone_measurement_stamp_sec_;
       if (period_sec >= config_.minimum_period_sec && period_sec <= config_.maximum_period_sec) {
         zone_periods_sec_.push_back(period_sec);
         if (zone_periods_sec_.size() > config_.maximum_period_history_size) {
@@ -67,7 +69,7 @@ AntitopControllerResult AntitopController::update(
         has_last_zone_entry_ = false;
       }
     }
-    last_zone_entry_stamp_sec_ = control_stamp_sec;
+    last_zone_measurement_stamp_sec_ = measurement_stamp_sec;
     has_last_zone_entry_ = true;
     average_period_sec_ = averageRecentPeriods();
   }
@@ -90,9 +92,10 @@ AntitopControllerResult AntitopController::update(
     zone_rising && tracker_state.calibrated && !countdown_active_ && matched_z_layer_ == 0 &&
     average_period_sec_ > 0.0)
   {
-    beginCountdown(tracker_state, flight_time_sec, control_stamp_sec);
+    beginCountdown(tracker_state, flight_time_sec, measurement_stamp_sec);
   }
-  const bool shoot_ready = countdown_active_ && control_stamp_sec >= fire_stamp_sec_;
+  // 目标事件先在 Tzone 时间轴上推出绝对 Tpermit；当前控制回调只负责比较 Tcontrol。
+  const bool shoot_ready = countdown_active_ && control_stamp_sec >= permit_stamp_sec_;
   if (shoot_ready) {
     countdown_active_ = false;
   }
@@ -105,11 +108,11 @@ void AntitopController::reset()
   zone_periods_sec_.clear();
   in_shoot_zone_ = false;
   has_last_zone_entry_ = false;
-  last_zone_entry_stamp_sec_ = 0.0;
+  last_zone_measurement_stamp_sec_ = 0.0;
   matched_z_layer_ = -1;
   average_period_sec_ = -1.0;
   countdown_active_ = false;
-  fire_stamp_sec_ = 0.0;
+  permit_stamp_sec_ = -1.0;
   target_aim_z_m_.reset();
 }
 
@@ -157,7 +160,7 @@ double AntitopController::averageRecentPeriods() const
 
 void AntitopController::beginCountdown(
   const AntitopTrackerState & tracker_state, double flight_time_sec,
-  double control_stamp_sec)
+  double zone_stamp_sec)
 {
   double bias_sec = 0.0;
   if (tracker_state.rotation_direction == 1) {
@@ -165,9 +168,8 @@ void AntitopController::beginCountdown(
   } else if (tracker_state.rotation_direction == 0) {
     bias_sec = config_.counterclockwise_time_bias_sec;
   }
-  const double delay_sec = std::max(
-    0.0, 3.0 * average_period_sec_ - config_.system_delay_sec - flight_time_sec + bias_sec);
-  fire_stamp_sec_ = control_stamp_sec + delay_sec;
+  permit_stamp_sec_ = zone_stamp_sec + 3.0 * average_period_sec_ -
+    config_.system_delay_sec - flight_time_sec + bias_sec;
   countdown_active_ = true;
 }
 
@@ -182,9 +184,11 @@ AntitopControllerResult AntitopController::makeResult(
   result.target_z_m = target_aim_z_m_.has_value() ? *target_aim_z_m_ :
     tracker_state.tracked_armor.position_m.z();
   result.average_period_sec = average_period_sec_;
+  result.zone_stamp_sec = has_last_zone_entry_ ? last_zone_measurement_stamp_sec_ : -1.0;
+  result.permit_stamp_sec = permit_stamp_sec_;
   result.countdown_active = countdown_active_;
   result.countdown_remaining_sec = countdown_active_ ?
-    std::max(0.0, fire_stamp_sec_ - control_stamp_sec) : 0.0;
+    std::max(0.0, permit_stamp_sec_ - control_stamp_sec) : 0.0;
   result.shoot_ready = shoot_ready;
   return result;
 }

@@ -22,6 +22,23 @@ rclcpp::QoS highRateQos()
   return rclcpp::QoS(rclcpp::KeepLast(1)).best_effort().durability_volatile();
 }
 
+double stampToSeconds(const builtin_interfaces::msg::Time & stamp)
+{
+  return static_cast<double>(stamp.sec) + static_cast<double>(stamp.nanosec) * 1e-9;
+}
+
+builtin_interfaces::msg::Time secondsToStamp(double seconds)
+{
+  builtin_interfaces::msg::Time stamp;
+  if (!std::isfinite(seconds) || seconds < 0.0) {
+    return stamp;
+  }
+  const auto nanoseconds = static_cast<std::int64_t>(seconds * 1e9);
+  stamp.sec = static_cast<std::int32_t>(nanoseconds / 1000000000LL);
+  stamp.nanosec = static_cast<std::uint32_t>(nanoseconds % 1000000000LL);
+  return stamp;
+}
+
 std::size_t positiveSizeParameter(const rclcpp::Node & node, const char * name)
 {
   const auto value = node.get_parameter(name).as_int();
@@ -281,7 +298,8 @@ void AimAntitopNode::receiveArmorPoses(const hero_msgs::msg::ArmorPoseArray::Con
       center_image_x_px = projectRotationCenterX(*tracker_state, message->header.stamp);
       if (center_image_x_px.has_value()) {
         controller_result = controller_.update(
-          *tracker_state, *center_image_x_px, result->flight_time_sec, control_time.seconds());
+          *tracker_state, *center_image_x_px, result->flight_time_sec,
+          stampToSeconds(message->header.stamp), control_time.seconds());
         // 最低层过区后，控制器把近期 Z 中位数作为目标高度；和旧 AntiTop 的
         // target_aim_z 一致，随后每帧都以这一高度重新解弹道。
         result = aimer_.aim(
@@ -360,6 +378,8 @@ void AimAntitopNode::publishDebug(
   if (controller_result.has_value()) {
     debug.matched_z_layer = controller_result->matched_z_layer;
     debug.average_period_sec = static_cast<float>(controller_result->average_period_sec);
+    debug.zone_stamp = secondsToStamp(controller_result->zone_stamp_sec);
+    debug.permit_stamp = secondsToStamp(controller_result->permit_stamp_sec);
     debug.in_shoot_zone = controller_result->in_shoot_zone;
     debug.countdown_active = controller_result->countdown_active;
     debug.countdown_remaining_sec = static_cast<float>(controller_result->countdown_remaining_sec);

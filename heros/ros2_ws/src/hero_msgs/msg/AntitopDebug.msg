@@ -5,6 +5,12 @@ std_msgs/Header header
 # 参与本次更新的原始装甲板观测时刻 T0。
 builtin_interfaces/Time measurement_stamp
 
+# 最近一次区域上升沿的图像观测时刻 Tzone；全零表示尚未进入过射击区。
+builtin_interfaces/Time zone_stamp
+
+# 计划放行 shoot_status 的绝对时刻 Tpermit；全零表示当前没有倒计时计划。
+builtin_interfaces/Time permit_stamp
+
 bool tracking_valid
 bool center_valid
 bool calibrated

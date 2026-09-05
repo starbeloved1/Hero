@@ -12,6 +12,8 @@
 | `Tmux` | `command_mux` 仲裁输出时刻 | 唯一 `/hero/gimbal/control` 的输出时刻 |
 | `Tsend` | 串口实际写出协议帧的时刻 | `gimbal_driver` 写入下位机的时刻 |
 | `Taim` | 预计弹丸命中目标的时刻 | `aim_auto` 用于重建目标未来装甲板位置的时刻 |
+| `Tzone` | 周期目标刚进入射击区的观测时刻 | `aim_antitop` 中某个图像的 `T0` |
+| `Tpermit` | 算法计划允许开火的绝对控制时刻 | `aim_antitop` 的区域、周期、延迟与飞行时间共同推得 |
 
 ## 一条图像的时间线
 
@@ -37,6 +39,34 @@ Taim = Tcontrol + 机构响应时间 + 弹丸飞行时间
 ```
 
 `T1` 只是“程序此刻处理到消息”的墙钟时刻，通常不需要写入消息；真正有算法语义的是 `T0`、`Tstate`、`Tcontrol` 与 `Taim`。
+
+## 周期事件：反前哨的 Tzone 与 Tpermit
+
+反前哨不是持续询问“目标在 `Taim` 在哪里”，而是先在图像中观察到一次周期事件：
+
+```text
+Tzone = 某帧 T0 中，装甲板刚进入射击区的时刻
+```
+
+旋转周期属于目标的物理运动，必须用相邻两个 `Tzone` 测量：
+
+```text
+period = 当前 Tzone - 上一次 Tzone
+```
+
+若预计目标在三个周期后到达理想位置，则控制许可的绝对时刻为：
+
+```text
+Tpermit = Tzone + 3 × period - system_delay - flight_time + direction_bias
+```
+
+算法处理到这帧时已经处于 `Tcontrol`，因此 controller 不能把 `Tcontrol` 当成区域发生时刻；它只应计算：
+
+```text
+countdown_remaining = Tpermit - Tcontrol
+```
+
+这样检测、PnP 或 ROS 调度变慢会增加 `Tcontrol - T0`，但不会篡改前哨的真实旋转周期。`AntitopDebug` 同时发布 `measurement_stamp`（当前帧 `T0`）、`zone_stamp`（最近 `Tzone`）和 `permit_stamp`（当前计划的 `Tpermit`），可在 Foxglove 中核对该关系。
 
 ## 模型、状态与观测
 
