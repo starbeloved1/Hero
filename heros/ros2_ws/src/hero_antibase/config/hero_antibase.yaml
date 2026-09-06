@@ -3,15 +3,16 @@ hero_antibase_node:
     # camera_router 在 mode4 自动将基地相机转发到 selected
     image_topic: /hero/camera/selected/image_raw # sub
     gimbal_state_topic: /hero/gimbal/state # sub
-    packet_topic: /hero/aim/antibase/packets # pub
-    tx_status_topic: /hero/aim/antibase/tx_status # sub
-    debug_topic: /hero/aim/antibase/debug # pub
+    packet_topic: /hero/antibase/packets # pub
+    tx_status_topic: /hero/antibase/tx_status # sub
+    debug_topic: /hero/antibase/debug # pub
     packet_queue_depth: 64
 
     # 仅用于 Foxglove 查看送入编码器的图像
     visualization_enabled: false
-    visualization_topic: /hero/aim/antibase/visualization
-    visualization_rate_hz: 10.0
+    visualization_topic: /hero/antibase/visualization
+    # 0 表示跟随每个已处理输入；设为正数才对调试图抽帧。
+    visualization_rate_hz: 0.0
 
     # antibase 编码节拍和传输约束
     output_fps: 30

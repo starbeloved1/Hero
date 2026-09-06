@@ -108,6 +108,7 @@ ArmorSolverNode::ArmorSolverNode(): Node("armor_solver_node")
 {
   declare_parameter<std::string>("armor_topic", "/hero/detector/armors");
   declare_parameter<std::string>("camera_info_topic", "/hero/camera/selected/camera_info");
+  declare_parameter<std::string>("gimbal_state_topic", "/hero/gimbal/state");
   declare_parameter<std::string>("armor_pose_topic", "/hero/solver/armor_poses");
   declare_parameter<std::string>("target_frame_id", "world");
   declare_parameter<double>("tf_lookup_timeout_sec", 0.05);
@@ -122,9 +123,11 @@ ArmorSolverNode::ArmorSolverNode(): Node("armor_solver_node")
 
   const auto armor_topic = get_parameter("armor_topic").as_string();
   const auto camera_info_topic = get_parameter("camera_info_topic").as_string();
+  const auto gimbal_state_topic = get_parameter("gimbal_state_topic").as_string();
   const auto armor_pose_topic = get_parameter("armor_pose_topic").as_string();
-  if (armor_topic.empty() || camera_info_topic.empty() || armor_pose_topic.empty()) {
-    throw std::invalid_argument("装甲板、相机内参和位姿话题不能为空");
+  if (armor_topic.empty() || camera_info_topic.empty() ||
+      gimbal_state_topic.empty() || armor_pose_topic.empty()) {
+    throw std::invalid_argument("装甲板、相机内参、云台状态和位姿话题不能为空");
   }
 
   const auto qos = highRateQos();
@@ -135,6 +138,11 @@ ArmorSolverNode::ArmorSolverNode(): Node("armor_solver_node")
   camera_info_sub_ = create_subscription<sensor_msgs::msg::CameraInfo>(
     camera_info_topic, qos,
     [this](const sensor_msgs::msg::CameraInfo::ConstSharedPtr message) {receiveCameraInfo(message);});
+  gimbal_state_sub_ = create_subscription<hero_msgs::msg::GimbalState>(
+    gimbal_state_topic, qos,
+    [this](const hero_msgs::msg::GimbalState::ConstSharedPtr message) {
+      receiveGimbalState(message);
+    });
   if (get_parameter("visualization_enabled").as_bool()) {
     const auto visualization_topic = get_parameter("visualization_topic").as_string();
     if (visualization_topic.empty()) {
@@ -153,6 +161,11 @@ ArmorSolverNode::ArmorSolverNode(): Node("armor_solver_node")
 
 void ArmorSolverNode::receiveCameraInfo(const sensor_msgs::msg::CameraInfo::ConstSharedPtr & message)
 {
+  // mode4 的 selected 来自基地相机，只供 hero_antibase 编码；不能让其
+  // CameraInfo 参与装甲板 PnP，也不应对尚未标定的基地内参重复报警。
+  if (gimbal_mode_.load() == hero_msgs::msg::GimbalState::MODE_ANTI_BASE) {
+    return;
+  }
   CameraIntrinsics intrinsics;
   for (std::size_t index = 0; index < intrinsics.matrix.size(); ++index) {
     intrinsics.matrix[index] = message->k[index];
@@ -167,8 +180,17 @@ void ArmorSolverNode::receiveCameraInfo(const sensor_msgs::msg::CameraInfo::Cons
   has_intrinsics_ = true;
 }
 
+void ArmorSolverNode::receiveGimbalState(
+  const hero_msgs::msg::GimbalState::ConstSharedPtr & message)
+{
+  gimbal_mode_.store(message->mode);
+}
+
 void ArmorSolverNode::receiveArmors(const hero_msgs::msg::ArmorArray::ConstSharedPtr & message)
 {
+  if (gimbal_mode_.load() == hero_msgs::msg::GimbalState::MODE_ANTI_BASE) {
+    return;
+  }
   CameraIntrinsics intrinsics;
   {
     std::lock_guard<std::mutex> lock(intrinsics_mutex_);

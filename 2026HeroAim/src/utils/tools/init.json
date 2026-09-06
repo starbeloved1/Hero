@@ -57,9 +57,9 @@
             "sn": "FDN23020227"
         },
         "camera_type": 8,
-        "device_type": 0,
+        "device_type": 1,
         "picture_path": "../src/utils/data/pictures/armors/",
-        "video_path": "../src/utils/data/videos/test2.mp4"
+        "video_path": "../src/utils/data/videos/test.mp4"
     },
     "controller": {
         "pic_camera_x": 640.0,
@@ -79,8 +79,8 @@
         "model": "CNN"
     },
     "debug": {
-        "enable": false,
-        "stream": false,
+        "enable": true,
+        "stream": true,
         "big_id": -1,
         "color": -2,
         "mode": 1,
@@ -101,7 +101,7 @@
     },
     "detector": {
         "color": 1,
-        "score_threshold": 0.75,
+        "score_threshold": 0.2,
         "nms_threshold": 0.45,
         "armor_infer_device": "GPU",
         "armor_model_path": "../src/utils/model/0526.onnx",
@@ -137,8 +137,8 @@
         "max_valid_radius": 0.5
     },
     "serialport": {
-        "deviceName": "/dev/ttyACM0",
-        "enable": 1
+        "deviceName": "virtual",
+        "enable": 0
     },
     "anti_base": {
         "udp_debug_enabled": false,

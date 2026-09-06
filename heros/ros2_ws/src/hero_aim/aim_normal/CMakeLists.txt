@@ -9,6 +9,7 @@ find_package(ament_cmake REQUIRED)
 find_package(aim_core REQUIRED)
 find_package(hero_msgs REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(visualization_msgs REQUIRED)
 
 add_library(aim_normal_core src/armor_selector.cpp src/normal_aimer.cpp)
 target_compile_features(aim_normal_core PUBLIC cxx_std_17)
@@ -22,7 +23,7 @@ add_executable(aim_normal_node src/aim_normal_node.cpp src/main.cpp)
 target_compile_features(aim_normal_node PUBLIC cxx_std_17)
 target_include_directories(aim_normal_node PRIVATE include)
 target_link_libraries(aim_normal_node aim_normal_core)
-ament_target_dependencies(aim_normal_node aim_core hero_msgs rclcpp)
+ament_target_dependencies(aim_normal_node aim_core hero_msgs rclcpp visualization_msgs)
 
 install(TARGETS aim_normal_core aim_normal_node
   ARCHIVE DESTINATION lib

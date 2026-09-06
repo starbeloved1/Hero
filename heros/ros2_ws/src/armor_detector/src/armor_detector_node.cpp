@@ -103,12 +103,15 @@ DetectorNode::DetectorNode() : Node("armor_detector_node") {
     if (visualization_topic.empty()) {
       throw std::invalid_argument("visualization_topic 不能为空");
     }
-    if (visualization_rate_hz <= 0.0) {
-      throw std::invalid_argument("visualization_rate_hz 必须大于 0");
+    if (visualization_rate_hz < 0.0) {
+      throw std::invalid_argument("visualization_rate_hz 不能为负数");
     }
-    visualization_period_ =
-        std::chrono::duration_cast<std::chrono::nanoseconds>(
-            std::chrono::duration<double>(1.0 / visualization_rate_hz));
+    // 0 表示不额外抽帧，逐个已处理输入发布可视化；正数才限频。
+    if (visualization_rate_hz > 0.0) {
+      visualization_period_ =
+          std::chrono::duration_cast<std::chrono::nanoseconds>(
+              std::chrono::duration<double>(1.0 / visualization_rate_hz));
+    }
     visualization_pub_ = create_publisher<sensor_msgs::msg::Image>(
         visualization_topic, highRateQos());
   }
@@ -254,7 +257,8 @@ bool DetectorNode::shouldPublishVisualization() {
     return false;
   }
   const auto now = std::chrono::steady_clock::now();
-  if (last_visualization_time_.time_since_epoch().count() != 0 &&
+  if (visualization_period_.count() > 0 &&
+      last_visualization_time_.time_since_epoch().count() != 0 &&
       now - last_visualization_time_ < visualization_period_) {
     return false;
   }

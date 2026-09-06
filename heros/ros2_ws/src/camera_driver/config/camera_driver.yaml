@@ -9,7 +9,6 @@ camera_driver_node:
     aim8mm.frame_id: aim8mm_camera_optical_frame
     aim8mm.image_topic: /hero/camera/aim8mm/image_raw
     aim8mm.camera_info_topic: /hero/camera/aim8mm/camera_info
-    # 仅大恒输入使用；视频输入自动读取视频实际分辨率
     aim8mm.width: 1280
     aim8mm.height: 1024
     aim8mm.exposure_time_us: 4000.0
@@ -33,7 +32,6 @@ camera_driver_node:
     base.frame_id: base_camera_optical_frame
     base.image_topic: /hero/camera/base/image_raw
     base.camera_info_topic: /hero/camera/base/camera_info
-    # 仅大恒输入使用；视频输入自动读取视频实际分辨率。
     base.width: 1280
     base.height: 1024
     base.exposure_time_us: 12000.0

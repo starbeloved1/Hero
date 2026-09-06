@@ -373,12 +373,19 @@ void AimAntitopNode::receiveGimbalState(
   if (message->mode != hero_msgs::msg::GimbalState::MODE_ANTI_TOP) {
     tracker_.reset();
     controller_.reset();
+    latest_camera_info_.reset();
   }
   latest_gimbal_state_ = *message;
 }
 
 void AimAntitopNode::receiveCameraInfo(
     const sensor_msgs::msg::CameraInfo::ConstSharedPtr &message) {
+  // selected 在 mode4 切到基地相机；反前哨只应消费 mode2 的相机内参。
+  if (!latest_gimbal_state_.has_value() ||
+      latest_gimbal_state_->mode !=
+          hero_msgs::msg::GimbalState::MODE_ANTI_TOP) {
+    return;
+  }
   if (message->header.frame_id.empty() || message->k[0] <= 0.0 ||
       message->k[4] <= 0.0) {
     RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000,

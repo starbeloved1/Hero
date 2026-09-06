@@ -67,6 +67,23 @@ find_package(Boost REQUIRED COMPONENTS system thread)
 find_package(glog REQUIRED)
 
 # (7) OpenVINO (神经网络推理)
+# 本工程的开发环境将 OpenVINO 安装在用户目录，而不是系统默认的
+# /opt/intel 路径。优先尊重 -DOpenVINO_DIR=...；空 build 目录下则自动
+# 定位 ~/.local 中的 OpenVINOConfig.cmake，与 heros/build.sh 保持一致。
+if(NOT DEFINED OpenVINO_DIR OR NOT EXISTS "${OpenVINO_DIR}/OpenVINOConfig.cmake")
+    file(GLOB_RECURSE HERO_OPENVINO_CONFIGS
+        LIST_DIRECTORIES false
+        "$ENV{HOME}/.local/*OpenVINOConfig.cmake")
+    list(SORT HERO_OPENVINO_CONFIGS)
+    list(LENGTH HERO_OPENVINO_CONFIGS HERO_OPENVINO_CONFIG_COUNT)
+    if(HERO_OPENVINO_CONFIG_COUNT GREATER 0)
+        list(GET HERO_OPENVINO_CONFIGS 0 HERO_OPENVINO_CONFIG)
+        get_filename_component(HERO_OPENVINO_DIR "${HERO_OPENVINO_CONFIG}" DIRECTORY)
+        set(OpenVINO_DIR "${HERO_OPENVINO_DIR}" CACHE PATH
+            "OpenVINO CMake configuration directory" FORCE)
+        message(STATUS "Auto-detected OpenVINO: ${OpenVINO_DIR}")
+    endif()
+endif()
 find_package(OpenVINO REQUIRED)
 message(STATUS "OpenVINO version: ${OpenVINO_VERSION}")
 
@@ -75,6 +92,25 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(JSONCPP REQUIRED jsoncpp)
 
 # (8.1) PoseLib (PnPL + RANSAC + bundle refinement)
+# PoseLib 也随本机用户级依赖安装。保留显式 -DPoseLib_DIR 的优先级，
+# 仅在没有有效路径时自动查找，保证 rm -rf build 后仍可直接 cmake ..。
+if(NOT DEFINED PoseLib_DIR OR NOT EXISTS "${PoseLib_DIR}/PoseLibConfig.cmake")
+    file(GLOB_RECURSE HERO_POSELIB_CONFIGS
+        LIST_DIRECTORIES false
+        "$ENV{HOME}/.local/*PoseLibConfig.cmake")
+    list(SORT HERO_POSELIB_CONFIGS)
+    # 忽略源码树中可能留下的生成期 Config：它没有安装后的
+    # PoseLibTargets.cmake，不能被 find_package 正常使用。
+    foreach(HERO_POSELIB_CONFIG IN LISTS HERO_POSELIB_CONFIGS)
+        get_filename_component(HERO_POSELIB_DIR "${HERO_POSELIB_CONFIG}" DIRECTORY)
+        if(EXISTS "${HERO_POSELIB_DIR}/PoseLibTargets.cmake")
+            set(PoseLib_DIR "${HERO_POSELIB_DIR}" CACHE PATH
+                "PoseLib CMake configuration directory" FORCE)
+            message(STATUS "Auto-detected PoseLib: ${PoseLib_DIR}")
+            break()
+        endif()
+    endforeach()
+endif()
 find_package(PoseLib REQUIRED)
 message(STATUS "Found PoseLib, using PoseLib PnPL solver")
 

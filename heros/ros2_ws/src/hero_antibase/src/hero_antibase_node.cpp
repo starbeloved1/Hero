@@ -23,13 +23,13 @@ HeroAntiBaseNode::HeroAntiBaseNode() : Node("hero_antibase_node") {
   declare_parameter<std::string>("image_topic",
                                  "/hero/camera/selected/image_raw");
   declare_parameter<std::string>("gimbal_state_topic", "/hero/gimbal/state");
-  declare_parameter<std::string>("packet_topic", "/hero/aim/antibase/packets");
+  declare_parameter<std::string>("packet_topic", "/hero/antibase/packets");
   declare_parameter<std::string>("tx_status_topic",
-                                 "/hero/aim/antibase/tx_status");
-  declare_parameter<std::string>("debug_topic", "/hero/aim/antibase/debug");
+                                 "/hero/antibase/tx_status");
+  declare_parameter<std::string>("debug_topic", "/hero/antibase/debug");
   declare_parameter<bool>("visualization_enabled", false);
   declare_parameter<std::string>("visualization_topic",
-                                 "/hero/aim/antibase/visualization");
+                                 "/hero/antibase/visualization");
   declare_parameter<double>("visualization_rate_hz", 10.0);
   declare_parameter<int>("packet_queue_depth", 64);
 
@@ -141,12 +141,15 @@ HeroAntiBaseNode::HeroAntiBaseNode() : Node("hero_antibase_node") {
       get_parameter("debug_topic").as_string(), highRateQos());
   if (get_parameter("visualization_enabled").as_bool()) {
     const auto rate = get_parameter("visualization_rate_hz").as_double();
-    if (rate <= 0.0) {
-      throw std::invalid_argument("visualization_rate_hz 必须为正");
+    if (rate < 0.0) {
+      throw std::invalid_argument("visualization_rate_hz 不能为负数");
     }
-    visualization_period_ =
-        std::chrono::duration_cast<std::chrono::nanoseconds>(
-            std::chrono::duration<double>(1.0 / rate));
+    // 0 表示不额外抽帧，逐个已处理输入发布可视化；正数才限频。
+    if (rate > 0.0) {
+      visualization_period_ =
+          std::chrono::duration_cast<std::chrono::nanoseconds>(
+              std::chrono::duration<double>(1.0 / rate));
+    }
     visualization_pub_ = create_publisher<sensor_msgs::msg::Image>(
         get_parameter("visualization_topic").as_string(), highRateQos());
   }
@@ -286,7 +289,8 @@ bool HeroAntiBaseNode::shouldPublishVisualization() {
     return false;
   }
   const auto now = std::chrono::steady_clock::now();
-  if (last_visualization_time_.time_since_epoch().count() != 0 &&
+  if (visualization_period_.count() > 0 &&
+      last_visualization_time_.time_since_epoch().count() != 0 &&
       now - last_visualization_time_ < visualization_period_) {
     return false;
   }

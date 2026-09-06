@@ -57,9 +57,9 @@ GimbalDriverNode::GimbalDriverNode()
   declare_parameter<double>("state_publish_rate_hz", 200.0);
   declare_parameter<double>("command_send_rate_hz", 200.0);
   declare_parameter<std::string>("antibase_packet_topic",
-                                 "/hero/aim/antibase/packets");
+                                 "/hero/antibase/packets");
   declare_parameter<std::string>("antibase_tx_status_topic",
-                                 "/hero/aim/antibase/tx_status");
+                                 "/hero/antibase/tx_status");
   declare_parameter<double>("antibase_min_packet_gap_ms", 21.0);
   declare_parameter<double>("antibase_chunk_gap_ms", 2.0);
   declare_parameter<int>("antibase_queue_depth", 64);

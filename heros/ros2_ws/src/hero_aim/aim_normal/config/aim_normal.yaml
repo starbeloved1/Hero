@@ -7,6 +7,9 @@ aim_normal_node:
     gimbal_state_topic: /hero/gimbal/state # sub
     control_candidate_topic: /hero/aim/normalaim/controller # pub
     debug_topic: /hero/aim/normalaim/debug # pub
+    # 3D 可视化：观测装甲板为蓝色，选中目标为绿色；橙色表示丢帧保持的目标。
+    visualization_enabled: true
+    visualization_topic: /hero/aim/normalaim/markers # pub
     target_frame_id: world
 
     # 相邻帧内距离小于此值，认为是同一目标

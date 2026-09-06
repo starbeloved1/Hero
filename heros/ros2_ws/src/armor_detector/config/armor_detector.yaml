@@ -7,11 +7,12 @@ armor_detector_node:
     # 可视化选择
     visualization_enabled: true
     visualization_topic: /hero/detector/visualization
-    visualization_rate_hz: 30.0
+    # 0 表示跟随每个已处理输入；设为正数才对调试图抽帧。
+    visualization_rate_hz: 0.0
 
     model_path: model/0526.onnx
     inference_device: GPU
-    confidence_threshold: 0.75
+    confidence_threshold: 0.2
     nms_threshold: 0.45
 
     # -1自动选择敌方；-2不按颜色过滤；0/1固定敌方颜色。0=蓝色，1=红色
