@@ -12,7 +12,7 @@ constexpr std::size_t kReadFrameSize = 16U;
 constexpr std::size_t kWriteFrameSize = 14U;
 constexpr uint8_t kFrameStart = static_cast<uint8_t>('!');
 
-// 这些结构保留旧串口单位：yaw/pitch 使用角度。
+// 这些结构保留旧串口单位：yaw/pitch 使用角度
 struct LegacyReadFrame
 {
   uint8_t mode_flag{0U};

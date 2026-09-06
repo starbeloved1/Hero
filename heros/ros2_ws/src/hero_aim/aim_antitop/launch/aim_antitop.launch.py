@@ -13,7 +13,7 @@ def generate_launch_description():
             executable="aim_antitop_node",
             name="aim_antitop_node",
             output="screen",
-            # 先载入公共弹道参数，再载入反前哨自身参数。
+            # 先载入公共弹道参数，再载入反前哨自身参数
             parameters=[ballistics_config, strategy_config],
         )
     ])

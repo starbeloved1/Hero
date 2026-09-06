@@ -47,7 +47,7 @@ TEST(SerialProtocol, DecodesLegacyReadFrameAndNormalizesYaw)
 TEST(SerialProtocol, MatchesLegacyCrc16Variant)
 {
   const std::array<uint8_t, 2U> bytes{kFrameStart, 0x05U};
-  // 旧 SerialPort::getCRC16 以 0xffff 初始化，并使用反射形式的 0x8408 多项式。
+  // 旧 SerialPort::getCRC16 以 0xffff 初始化，并使用反射形式的 0x8408 多项式
   EXPECT_EQ(crc16(bytes.data(), bytes.size()), 0x9DFEU);
 }
 

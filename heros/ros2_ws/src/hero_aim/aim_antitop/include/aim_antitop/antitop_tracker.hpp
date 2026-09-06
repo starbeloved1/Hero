@@ -51,7 +51,7 @@ struct AntitopTrackerState
   std::int8_t rotation_direction{-1};
 };
 
-// 反前哨的第一阶段：连续选择前哨板、拟合 XY 旋转中心、采样三层高度。
+// 反前哨的第一阶段：连续选择前哨板、拟合 XY 旋转中心、采样三层高度
 class AntitopTracker
 {
 public:

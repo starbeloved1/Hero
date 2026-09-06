@@ -144,7 +144,7 @@ HeroAntiBaseNode::HeroAntiBaseNode() : Node("hero_antibase_node") {
     if (rate < 0.0) {
       throw std::invalid_argument("visualization_rate_hz 不能为负数");
     }
-    // 0 表示不额外抽帧，逐个已处理输入发布可视化；正数才限频。
+    // 0 表示不额外抽帧，逐个已处理输入发布可视化；正数才限频
     if (rate > 0.0) {
       visualization_period_ =
           std::chrono::duration_cast<std::chrono::nanoseconds>(

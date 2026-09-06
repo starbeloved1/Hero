@@ -1,14 +1,14 @@
 command_mux_node:
   ros__parameters:
     gimbal_state_topic: /hero/gimbal/state
-    # 此节点是唯一允许发布该 topic 的节点。
+    # 此节点是唯一允许发布该 topic 的节点
     control_topic: /hero/gimbal/control
 
-    # 每个模式使用独立候选入口；仲裁器仅放行当前 mode 对应的一路。
+    # 每个模式使用独立候选入口；仲裁器仅放行当前 mode 对应的一路
     normal_control_topic: /hero/aim/normalaim/controller
     anti_top_control_topic: /hero/aim/antitop/controller
     auto_control_topic: /hero/aim/autoaim/controller
 
     output_rate_hz: 200.0
-    # 候选命令超过该年龄后不再转发，改为保持当前角度并禁止开火。
+    # 候选命令超过该年龄后不再转发，改为保持当前角度并禁止开火
     max_command_age_sec: 0.1

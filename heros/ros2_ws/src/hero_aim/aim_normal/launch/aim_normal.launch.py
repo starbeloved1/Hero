@@ -14,7 +14,7 @@ def generate_launch_description():
             executable="aim_normal_node",
             name="aim_normal_node",
             output="screen",
-            # 先载入公共参数，再载入普通模式自身参数。
+            # 先载入公共参数，再载入普通模式自身参数
             parameters=[ballistics_config, smoother_config, strategy_config],
         )
     ])

@@ -14,7 +14,7 @@ namespace
 
 TEST(TransformUtils, LegacyCameraRotationUsesInverseDirection)
 {
-  // 旧标定 yaw=-90 度时，camera_link 的前向轴应在 gimbal_link 中指向 +Y。
+  // 旧标定 yaw=-90 度时，camera_link 的前向轴应在 gimbal_link 中指向 +Y
   const tf2::Matrix3x3 rotation(makeCamera2Gimbal(-90.0, 0.0, 0.0));
   const tf2::Vector3 transformed = rotation * tf2::Vector3(1.0, 0.0, 0.0);
   EXPECT_NEAR(transformed.x(), 0.0, 1e-9);

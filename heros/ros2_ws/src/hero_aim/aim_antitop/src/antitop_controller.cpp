@@ -56,7 +56,7 @@ AntitopControllerResult AntitopController::update(
   if (zone_rising) {
     if (has_last_zone_entry_) {
       // 周期属于目标物理运动，必须在图像采集时间 T0（这里记作 Tzone）上测量，
-      // 不能被检测、PnP 或 ROS 调度延迟污染。
+      // 不能被检测、PnP 或 ROS 调度延迟污染
       const double period_sec = measurement_stamp_sec - last_zone_measurement_stamp_sec_;
       if (period_sec >= config_.minimum_period_sec && period_sec <= config_.maximum_period_sec) {
         zone_periods_sec_.push_back(period_sec);
@@ -94,7 +94,7 @@ AntitopControllerResult AntitopController::update(
   {
     beginCountdown(tracker_state, flight_time_sec, measurement_stamp_sec);
   }
-  // 目标事件先在 Tzone 时间轴上推出绝对 Tpermit；当前控制回调只负责比较 Tcontrol。
+  // 目标事件先在 Tzone 时间轴上推出绝对 Tpermit；当前控制回调只负责比较 Tcontrol
   const bool shoot_ready = countdown_active_ && control_stamp_sec >= permit_stamp_sec_;
   if (shoot_ready) {
     countdown_active_ = false;

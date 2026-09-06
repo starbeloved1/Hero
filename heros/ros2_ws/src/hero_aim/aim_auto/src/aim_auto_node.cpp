@@ -171,7 +171,7 @@ AimAutoNode::AimAutoNode() : Node("aim_auto_node"), aimer_(AutoAimConfig{}) {
   declare_parameter<double>("high_acceleration_threshold_mps2", 0.5);
   declare_parameter<double>("stable_acceleration_threshold_mps2", 0.05);
   declare_parameter<int>("acceleration_stable_frames", 5);
-  // 公共平滑参数必须由 aim_core/config/angle_smoother.yaml 提供。
+  // 公共平滑参数必须由 aim_core/config/angle_smoother.yaml 提供
   declare_parameter("yaw_previous_weight",
                     rclcpp::ParameterType::PARAMETER_DOUBLE);
   declare_parameter("pitch_previous_weight",
@@ -389,7 +389,7 @@ void AimAutoNode::publishVisualization(
   header.stamp = control_time;
   int armor_marker_count = 0;
   if (result.has_value()) {
-    // 控制层四块装甲板和瞄点均表示预计命中时刻 Taim。
+    // 控制层四块装甲板和瞄点均表示预计命中时刻 Taim
     header.stamp = secondsToStamp(result->aim_time_sec);
     for (const auto &armor : result->predicted_armors) {
       markers.markers.push_back(makeArmorMarker(header, armor, "aim_armor",

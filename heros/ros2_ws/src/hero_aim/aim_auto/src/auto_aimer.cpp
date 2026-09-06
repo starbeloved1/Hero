@@ -191,7 +191,7 @@ AutoAimer::chooseArmor(const AutoTarget &target) const {
     if (fast && std::abs(armor.phase_error_rad) > config_.coming_angle_rad) {
       continue;
     }
-    // 高速旋转时只选择正朝可射窗口靠近的一面，避免刚离开正面的面板。
+    // 高速旋转时只选择正朝可射窗口靠近的一面，避免刚离开正面的面板
     if (fast && target.angular_velocity_radps > 0.0 &&
         armor.phase_error_rad > config_.leaving_angle_rad) {
       continue;

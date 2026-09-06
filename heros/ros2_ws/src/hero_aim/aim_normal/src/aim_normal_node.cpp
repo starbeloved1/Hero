@@ -118,7 +118,7 @@ AimNormalNode::AimNormalNode()
   declare_parameter<double>("keep_target_distance_m", 0.3);
   declare_parameter<int>("max_lost_frames", 0);
   declare_parameter<double>("large_armor_distance_factor", 1.2);
-  // 公共弹道参数没有 C++ 兜底值；必须由 aim_core/config/ballistics.yaml 提供。
+  // 公共弹道参数没有 C++ 兜底值；必须由 aim_core/config/ballistics.yaml 提供
   declare_parameter("bullet_speed_mps", rclcpp::ParameterType::PARAMETER_DOUBLE);
   declare_parameter("drag_coefficient", rclcpp::ParameterType::PARAMETER_DOUBLE);
   declare_parameter("gravity_mps2", rclcpp::ParameterType::PARAMETER_DOUBLE);
@@ -127,7 +127,7 @@ AimNormalNode::AimNormalNode()
   declare_parameter("bullet_radius_m", rclcpp::ParameterType::PARAMETER_DOUBLE);
   declare_parameter("muzzle_offset_m", rclcpp::ParameterType::PARAMETER_DOUBLE);
   declare_parameter("ballistic_iteration_count", rclcpp::ParameterType::PARAMETER_INTEGER);
-  // 公共平滑参数必须由 aim_core/config/angle_smoother.yaml 提供。
+  // 公共平滑参数必须由 aim_core/config/angle_smoother.yaml 提供
   declare_parameter("yaw_previous_weight", rclcpp::ParameterType::PARAMETER_DOUBLE);
   declare_parameter("pitch_previous_weight", rclcpp::ParameterType::PARAMETER_DOUBLE);
   declare_parameter("yaw_jump_threshold_deg", rclcpp::ParameterType::PARAMETER_DOUBLE);

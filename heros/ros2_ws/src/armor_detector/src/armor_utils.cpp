@@ -19,8 +19,8 @@ bool shouldKeepColor(int detected_color, int target_color)
 
 int mapModelClass2HeroId(int model_class)
 {
-  // 0526 模型：0=基地、1=英雄、2=工程、3/4/5=步兵、6=前哨、7=哨兵、8=未知。
-  // Hero 旧工程的公开编号：前哨为 7，哨兵为 0，基地为 6。
+  // 0526 模型：0=基地、1=英雄、2=工程、3/4/5=步兵、6=前哨、7=哨兵、8=未知
+  // Hero 旧工程的公开编号：前哨为 7，哨兵为 0，基地为 6
   switch (model_class) {
     case 0:
       return 6;

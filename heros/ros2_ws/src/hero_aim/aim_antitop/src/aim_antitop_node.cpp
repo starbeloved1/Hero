@@ -117,7 +117,7 @@ makeOutpostArmorMarker(const std_msgs::msg::Header &header, int id,
   marker.pose.position.z = position_m.z();
   marker.pose.orientation.z = std::sin(inward_yaw_rad * 0.5);
   marker.pose.orientation.w = std::cos(inward_yaw_rad * 0.5);
-  // 局部 x 轴朝向旋转中心：x 为板厚，y/z 为板宽高。
+  // 局部 x 轴朝向旋转中心：x 为板厚，y/z 为板宽高
   marker.scale.x = 0.01;
   marker.scale.y = 0.135;
   marker.scale.z = 0.056;
@@ -213,7 +213,7 @@ AimAntitopNode::AimAntitopNode()
   declare_parameter<double>("system_delay_sec", 0.05);
   declare_parameter<double>("clockwise_time_bias_sec", 0.0);
   declare_parameter<double>("counterclockwise_time_bias_sec", 0.0);
-  // 公共弹道参数没有 C++ 兜底值；必须由 aim_core/config/ballistics.yaml 提供。
+  // 公共弹道参数没有 C++ 兜底值；必须由 aim_core/config/ballistics.yaml 提供
   declare_parameter("bullet_speed_mps",
                     rclcpp::ParameterType::PARAMETER_DOUBLE);
   declare_parameter("drag_coefficient",
@@ -380,7 +380,7 @@ void AimAntitopNode::receiveGimbalState(
 
 void AimAntitopNode::receiveCameraInfo(
     const sensor_msgs::msg::CameraInfo::ConstSharedPtr &message) {
-  // selected 在 mode4 切到基地相机；反前哨只应消费 mode2 的相机内参。
+  // selected 在 mode4 切到基地相机；反前哨只应消费 mode2 的相机内参
   if (!latest_gimbal_state_.has_value() ||
       latest_gimbal_state_->mode !=
           hero_msgs::msg::GimbalState::MODE_ANTI_TOP) {
@@ -421,7 +421,7 @@ std::optional<double> AimAntitopNode::projectRotationCenterX(
     }
     // selected 图像仍是原始畸变图像，必须与旧 Solver::reproject
     // 一样带畸变投影。 camera_optical_frame 遵循 RDF，恰好与 OpenCV 相机坐标系
-    // x 右、y 下、z 前一致。
+    // x 右、y 下、z 前一致
     cv::Mat camera_matrix = cv::Mat::zeros(3, 3, CV_64F);
     for (int row = 0; row < 3; ++row) {
       for (int column = 0; column < 3; ++column) {
@@ -497,12 +497,12 @@ void AimAntitopNode::receiveArmorPoses(
             *tracker_state, *center_image_x_px, result->flight_time_sec,
             stampToSeconds(message->header.stamp), control_time.seconds());
         // 最低层过区后，控制器把近期 Z 中位数作为目标高度；和旧 AntiTop 的
-        // target_aim_z 一致，随后每帧都以这一高度重新解弹道。
+        // target_aim_z 一致，随后每帧都以这一高度重新解弹道
         result = aimer_.aim(*tracker_state, latest_gimbal_state_->yaw,
                             latest_gimbal_state_->pitch,
                             controller_result->target_z_m);
       } else {
-        // 无法把旋转中心投影到本帧图像时，取消倒计时，不能保留潜在的旧开火许可。
+        // 无法把旋转中心投影到本帧图像时，取消倒计时，不能保留潜在的旧开火许可
         controller_.reset();
       }
     }
@@ -602,7 +602,7 @@ void AimAntitopNode::publishVisualization(
   }
 
   visualization_msgs::msg::MarkerArray markers;
-  // 跟踪器的数据直接来自本次图像观测，因此这些标记代表 T0。
+  // 跟踪器的数据直接来自本次图像观测，因此这些标记代表 T0
   const auto measurement_header = message.header;
   if (!tracker_state.has_value()) {
     appendDeleteMarker(markers, measurement_header, "tracked_armor", 0);
@@ -621,7 +621,7 @@ void AimAntitopNode::publishVisualization(
         0.07, 0.1F, 0.9F, 1.0F));
     if (state.center_valid) {
       // 旋转中心只拟合 XY；线段末端采用当前板的
-      // Z，仅用来表示该板的水平转动半径。
+      // Z，仅用来表示该板的水平转动半径
       const Eigen::Vector3d axis_at_observation_height(
           state.rotation_center_m.x(), state.rotation_center_m.y(),
           state.tracked_armor.position_m.z());
@@ -634,7 +634,7 @@ void AimAntitopNode::publishVisualization(
           state.tracked_armor.position_m.x() - state.rotation_center_m.x(),
           state.tracked_armor.position_m.y() - state.rotation_center_m.y());
       if (std::isfinite(radius_m) && radius_m > 1e-4) {
-        // 每帧由当前观测的极角重建同相位三层板，因此 Marker 会随前哨实时转动。
+        // 每帧由当前观测的极角重建同相位三层板，因此 Marker 会随前哨实时转动
         const double phase_rad = std::atan2(
             state.tracked_armor.position_m.y() - state.rotation_center_m.y(),
             state.tracked_armor.position_m.x() - state.rotation_center_m.x());
@@ -702,7 +702,7 @@ void AimAntitopNode::publishVisualization(
   }
 
   // 瞄点是本次策略在 Tcontrol 得到的弹道输入点，和 T0
-  // 观测标记刻意分开保存时间戳。
+  // 观测标记刻意分开保存时间戳
   std_msgs::msg::Header control_header;
   control_header.stamp = control_time;
   control_header.frame_id = target_frame_id_;

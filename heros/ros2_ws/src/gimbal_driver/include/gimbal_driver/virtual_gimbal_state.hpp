@@ -7,7 +7,7 @@
 namespace gimbal_driver
 {
 
-// 本地调试时使用的固定云台状态；角度单位仍保持旧串口协议的角度制。
+// 本地调试时使用的固定云台状态；角度单位仍保持旧串口协议的角度制
 class VirtualGimbalState
 {
 public:

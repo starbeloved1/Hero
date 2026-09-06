@@ -51,6 +51,9 @@ private:
   void sendCommand();
   void receiveAntiBasePacket(const hero_msgs::msg::AntiBasePacket &message);
   void sendAntiBaseLoop();
+  void initializeAntiBaseUdpMirror();
+  void closeAntiBaseUdpMirror();
+  void mirrorAntiBasePacket(const hero_msgs::msg::AntiBasePacket &packet);
   void publishAntiBaseTxStatus();
   void updateMode(uint8_t mode);
   rcl_interfaces::msg::SetParametersResult
@@ -89,6 +92,11 @@ private:
   std::chrono::nanoseconds antibase_min_packet_gap_{0};
   std::chrono::nanoseconds antibase_chunk_gap_{0};
   std::size_t antibase_queue_depth_{64U};
+  bool antibase_udp_mirror_enabled_{false};
+  std::string antibase_udp_mirror_host_;
+  uint16_t antibase_udp_mirror_port_{0U};
+  int antibase_udp_mirror_fd_{-1};
+  uint64_t antibase_udp_mirror_send_failures_{0U};
   VirtualGimbalState virtual_state_;
 
   std::string gimbal_frame_id_;

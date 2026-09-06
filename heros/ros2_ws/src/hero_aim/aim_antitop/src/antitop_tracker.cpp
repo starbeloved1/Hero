@@ -61,7 +61,7 @@ std::optional<AntitopTrackerState> AntitopTracker::update(
     std::abs(selected->image_center_x_px - last_observation_->image_center_x_px) >=
     config_.max_pixel_jump_px)
   {
-    // 保持旧 AntiTop 的处理：二维跳变帧不参与中心、方向和高度更新。
+    // 保持旧 AntiTop 的处理：二维跳变帧不参与中心、方向和高度更新
     image_x_differences_.clear();
     last_observation_ = *selected;
     return std::nullopt;

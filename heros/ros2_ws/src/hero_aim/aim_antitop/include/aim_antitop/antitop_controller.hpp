@@ -33,16 +33,16 @@ struct AntitopControllerResult
   std::int8_t rotation_direction{-1};
   double target_z_m{0.0}; // 第二次 aim 使用的高度
   double average_period_sec{-1.0};
-  // 最近一次区域上升沿的观测时刻 Tzone；小于 0 表示尚未发生。
+  // 最近一次区域上升沿的观测时刻 Tzone；小于 0 表示尚未发生
   double zone_stamp_sec{-1.0};
-  // 应放行 shoot_status 的绝对控制时刻 Tpermit；小于 0 表示未安排。
+  // 应放行 shoot_status 的绝对控制时刻 Tpermit；小于 0 表示未安排
   double permit_stamp_sec{-1.0};
   bool countdown_active{false};
   double countdown_remaining_sec{0.0};
   bool shoot_ready{false};
 };
 
-// 反前哨控制器：管理射击区、周期、倒计时与一次性开火许可。
+// 反前哨控制器：管理射击区、周期、倒计时与一次性开火许可
 class AntitopController
 {
 public:

@@ -113,7 +113,7 @@ void CameraRouterNode::forwardImage(
     return;
   }
   auto selected_image = image;
-  // selected 是供后续算法使用的逻辑相机接口，统一使用当前选中相机坐标系名称。
+  // selected 是供后续算法使用的逻辑相机接口，统一使用当前选中相机坐标系名称
   selected_image.header.frame_id = selected_frame_id_;
   selected_image_pub_->publish(std::move(selected_image));
 }
@@ -125,7 +125,7 @@ void CameraRouterNode::forwardCameraInfo(
     return;
   }
   auto selected_camera_info = camera_info;
-  // 必须与 selected 图像使用同一 frame_id，时间戳保持物理相机采集时刻不变。
+  // 必须与 selected 图像使用同一 frame_id，时间戳保持物理相机采集时刻不变
   selected_camera_info.header.frame_id = selected_frame_id_;
   selected_camera_info_pub_->publish(std::move(selected_camera_info));
 }

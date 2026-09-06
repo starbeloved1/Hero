@@ -34,7 +34,7 @@ tf2::Quaternion makeCamera2Gimbal(
 
 tf2::Quaternion makeFLU2RDF()
 {
-  // camera_link 使用FLU；camera_optical_frame 使用RDF。
+  // camera_link 使用FLU；camera_optical_frame 使用RDF
   tf2::Quaternion result;
   result.setRPY(-kPi / 2.0, 0.0, -kPi / 2.0);
   return result;

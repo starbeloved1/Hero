@@ -15,7 +15,7 @@ CommandSource sourceForMode(std::uint8_t mode) {
   case hero_msgs::msg::GimbalState::MODE_AUTO_AIM:
     return CommandSource::kAuto;
   case hero_msgs::msg::GimbalState::MODE_ANTI_BASE:
-    // mode4 只发送反基地视频码流，不产生 yaw/pitch 控制候选。
+    // mode4 只发送反基地视频码流，不产生 yaw/pitch 控制候选
     return CommandSource::kNone;
   default:
     return CommandSource::kNone;

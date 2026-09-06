@@ -43,7 +43,7 @@ struct AutoAimConfig {
   int acceleration_stable_frames{5};
 };
 
-// 单块装甲板在本次控制预计命中时刻的预测结果。
+// 单块装甲板在本次控制预计命中时刻的预测结果
 struct AutoAimArmor {
   int index{-1};
   Eigen::Vector3d position_m{Eigen::Vector3d::Zero()};
@@ -51,7 +51,7 @@ struct AutoAimArmor {
   double phase_error_rad{0.0};
 };
 
-// 输出结果，会作为 ControlCommand、AutoAimDebug 与控制可视化的输入。
+// 输出结果，会作为 ControlCommand、AutoAimDebug 与控制可视化的输入
 struct AutoAimResult {
   bool valid{false};
   bool target_locked{false};

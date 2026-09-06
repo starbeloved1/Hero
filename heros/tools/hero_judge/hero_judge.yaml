@@ -1,0 +1,19 @@
+# AntiBase 裁判模拟器配置
+# 改完 MQTT 地址或端口时，也要同步修改 mosquitto_hero_judge.conf
+
+# 接收 gimbal_driver 在最终串口节拍点镜像出的完整逻辑包
+udp_host: 127.0.0.1
+udp_port: 9999
+
+# 放行包以比赛格式发布到 MQTT broker
+mqtt_host: 127.0.0.1
+mqtt_port: 3333
+mqtt_topic: CustomByteBlock
+mqtt_client_id: hero_judge
+mqtt_qos: 1
+
+# 裁判规则：相邻收到包的间隔小于或等于此值，丢弃当前包
+min_packet_gap_ms: 20.0
+
+# 终端统计打印周期
+stats_interval_sec: 1.0

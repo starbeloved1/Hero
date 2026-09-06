@@ -44,7 +44,7 @@ geometry_msgs::msg::Quaternion quaternionFromRvec(const cv::Vec3d & rvec)
     return quaternion;
   }
 
-  // 本工程装甲板姿态通常接近正面；该分支处理接近 180 度旋转的退化情况。
+  // 本工程装甲板姿态通常接近正面；该分支处理接近 180 度旋转的退化情况
   const auto diagonal = std::array<double, 3>{
     rotation.at<double>(0, 0), rotation.at<double>(1, 1), rotation.at<double>(2, 2)};
   const auto axis = diagonal[0] > diagonal[1] && diagonal[0] > diagonal[2] ? 0 :
@@ -162,7 +162,7 @@ ArmorSolverNode::ArmorSolverNode(): Node("armor_solver_node")
 void ArmorSolverNode::receiveCameraInfo(const sensor_msgs::msg::CameraInfo::ConstSharedPtr & message)
 {
   // mode4 的 selected 来自基地相机，只供 hero_antibase 编码；不能让其
-  // CameraInfo 参与装甲板 PnP，也不应对尚未标定的基地内参重复报警。
+  // CameraInfo 参与装甲板 PnP，也不应对尚未标定的基地内参重复报警
   if (gimbal_mode_.load() == hero_msgs::msg::GimbalState::MODE_ANTI_BASE) {
     return;
   }

@@ -205,7 +205,7 @@ CameraDriverNode::~CameraDriverNode()
 void CameraDriverNode::captureLoop(Stream & stream)
 {
   // 本地视频没有硬件帧到达事件。以绝对时间轴回放，避免把解码和 ROS
-  // 发布耗时额外累加到每一帧的 sleep 中而让整段视频逐渐变慢。
+  // 发布耗时额外累加到每一帧的 sleep 中而让整段视频逐渐变慢
   auto next_video_frame_time = std::chrono::steady_clock::now();
   while (rclcpp::ok() && running_.load()) {
     Frame frame;

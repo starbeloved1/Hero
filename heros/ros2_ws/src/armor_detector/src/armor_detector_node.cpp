@@ -42,7 +42,7 @@ std::string resolveModelPath(const std::string &configured_path) {
   }
 
   // 模型统一存放在 heros/model。开发环境与部署目录均从功能包 share
-  // 目录向上查找。
+  // 目录向上查找
   for (auto directory = package_share; !directory.empty();
        directory = directory.parent_path()) {
     const auto project_model = directory / "model" / path.filename();
@@ -69,7 +69,7 @@ DetectorNode::DetectorNode() : Node("armor_detector_node") {
   declare_parameter<double>("confidence_threshold", 0.75);
   declare_parameter<double>("nms_threshold", 0.45);
   // -1：根据 robot_color
-  // 自动选择敌方颜色；-2：不按颜色过滤；0/1：固定目标颜色。
+  // 自动选择敌方颜色；-2：不按颜色过滤；0/1：固定目标颜色
   declare_parameter<int>("target_color", -1);
 
   target_color_ = get_parameter("target_color").as_int();
@@ -106,7 +106,7 @@ DetectorNode::DetectorNode() : Node("armor_detector_node") {
     if (visualization_rate_hz < 0.0) {
       throw std::invalid_argument("visualization_rate_hz 不能为负数");
     }
-    // 0 表示不额外抽帧，逐个已处理输入发布可视化；正数才限频。
+    // 0 表示不额外抽帧，逐个已处理输入发布可视化；正数才限频
     if (visualization_rate_hz > 0.0) {
       visualization_period_ =
           std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -120,7 +120,7 @@ DetectorNode::DetectorNode() : Node("armor_detector_node") {
       [this](const sensor_msgs::msg::Image::ConstSharedPtr image) {
         receiveImage(image);
       });
-  // 即使颜色不是自动模式，也需感知 mode4：旧工程在反基地时不运行装甲板检测。
+  // 即使颜色不是自动模式，也需感知 mode4：旧工程在反基地时不运行装甲板检测
   gimbal_state_sub_ = create_subscription<hero_msgs::msg::GimbalState>(
       get_parameter("gimbal_state_topic").as_string(), highRateQos(),
       [this](const hero_msgs::msg::GimbalState::ConstSharedPtr state) {
@@ -185,7 +185,7 @@ void DetectorNode::processLoop() {
     const auto target_color = resolveTargetColor();
     if (gimbal_mode_.load() == hero_msgs::msg::GimbalState::MODE_ANTI_BASE) {
       // mode4 的 selected 是基地相机，交给 hero_antibase
-      // 编码；不发布旧检测结果。
+      // 编码；不发布旧检测结果
       continue;
     }
     if (target_color == -1) {

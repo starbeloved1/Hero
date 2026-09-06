@@ -7,7 +7,7 @@ armor_detector_node:
     # 可视化选择
     visualization_enabled: true
     visualization_topic: /hero/detector/visualization
-    # 0 表示跟随每个已处理输入；设为正数才对调试图抽帧。
+    # 0 表示跟随每个已处理输入
     visualization_rate_hz: 0.0
 
     model_path: model/0526.onnx

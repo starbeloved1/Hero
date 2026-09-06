@@ -5,7 +5,7 @@ set -eo pipefail
 project_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 source /opt/ros/humble/setup.bash
 
-# 自动定位本机 OpenVINO；也允许用户在终端中显式指定 OpenVINO_DIR。
+# 自动定位本机 OpenVINO；也允许用户在终端中显式指定 OpenVINO_DIR
 hero_openvino_dir="${OpenVINO_DIR:-}"
 if [[ -z "${hero_openvino_dir}" || ! -f "${hero_openvino_dir}/OpenVINOConfig.cmake" ]]; then
   hero_openvino_config=$(find "${HOME}/.local" -type f \
@@ -37,7 +37,7 @@ cleanup() {
 trap cleanup EXIT
 trap 'cleanup; exit 0' INT TERM
 
-# 各功能包自行读取其 config 目录下的 YAML，不在这里覆盖参数。
+# 各功能包自行读取其 config 目录下的 YAML，不在这里覆盖参数
 ros2 launch gimbal_driver gimbal_driver.launch.py &
 pids+=("$!")
 

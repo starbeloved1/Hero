@@ -30,7 +30,7 @@ TEST(AntitopController, StartsCountdownAfterTwoValidPeriodsAtLowestLayer)
 {
   AntitopController controller(makeTestConfig());
   const auto state = makeTrackerState(0.9, 100.0);
-  // Tcontrol 故意加入不一致的处理延迟；周期仍必须只由 T0 计算为 0.6 秒。
+  // Tcontrol 故意加入不一致的处理延迟；周期仍必须只由 T0 计算为 0.6 秒
   controller.update(state, 100.0, 0.0, 10.0, 10.1);
   controller.update(makeTrackerState(0.9, 140.0), 100.0, 0.0, 10.1, 10.3);
   controller.update(state, 100.0, 0.0, 10.6, 11.2);
@@ -42,7 +42,7 @@ TEST(AntitopController, StartsCountdownAfterTwoValidPeriodsAtLowestLayer)
   EXPECT_NEAR(countdown.zone_stamp_sec, 11.2, 1e-9);
   EXPECT_NEAR(countdown.permit_stamp_sec, 12.95, 1e-9);
   EXPECT_NEAR(countdown.countdown_remaining_sec, 0.95, 1e-9);
-  // 进入最低层射击区时，近期 Z 中位数同时成为后续弹道的目标高度。
+  // 进入最低层射击区时，近期 Z 中位数同时成为后续弹道的目标高度
   EXPECT_NEAR(countdown.target_z_m, 0.9, 1e-9);
 
   const auto fire = controller.update(state, 100.0, 0.0, 12.1, 13.0);

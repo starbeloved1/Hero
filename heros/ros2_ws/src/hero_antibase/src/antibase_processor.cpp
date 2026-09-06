@@ -214,7 +214,7 @@ cv::Mat AntiBaseProcessor::preprocess(const cv::Mat &image,
         cv::max(trail_image, trail_frames_[index], trail_image);
       }
       if (config_.trail_brightness_gain > 1.0) {
-        // 与 26hero 一致：只提亮 Y，不能把 BGR 三通道同时放大而改变色相。
+        // 与 26hero 一致：只提亮 Y，不能把 BGR 三通道同时放大而改变色相
         cv::Mat ycrcb;
         cv::cvtColor(trail_image, ycrcb, cv::COLOR_BGR2YCrCb);
         std::vector<cv::Mat> channels;
@@ -303,7 +303,7 @@ void AntiBaseProcessor::updateBitrate(const TxFeedback &feedback) {
   const auto encoded_kbps = static_cast<double>(encoded_bytes_since_control_) *
                             8.0 / 1000.0 / elapsed_s;
   const auto full_pps = 1000.0 / config_.min_packet_gap_ms;
-  // H.264 可用净载荷不包含 8B 序号：292B * 49.75Hz = 116.2kbps。
+  // H.264 可用净载荷不包含 8B 序号：292B * 49.75Hz = 116.2kbps
   const auto h264_capacity_kbps =
       static_cast<double>(kPacketPayloadBytes) * 8.0 /
       config_.min_packet_gap_ms;

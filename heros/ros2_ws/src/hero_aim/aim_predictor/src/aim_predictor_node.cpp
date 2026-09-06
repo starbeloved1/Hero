@@ -41,7 +41,7 @@ planeNormal(const geometry_msgs::msg::Quaternion &orientation) {
   const double y = orientation.y / norm;
   const double z = orientation.z / norm;
   const double w = orientation.w / norm;
-  // PnP 装甲板局部 z 轴是板面法向。
+  // PnP 装甲板局部 z 轴是板面法向
   const double normal_x = 2.0 * (x * z + w * y);
   const double normal_y = 2.0 * (y * z - w * x);
   const double normal_z = 1.0 - 2.0 * (x * x + y * y);
@@ -70,7 +70,7 @@ makeCubeMarker(const std_msgs::msg::Header &header,
   marker.type = visualization_msgs::msg::Marker::CUBE;
   marker.action = visualization_msgs::msg::Marker::ADD;
   marker.pose = pose;
-  // 预测板的局部 x 轴是板到车心的内向方向，因此 x 为板厚，y/z 为板宽高。
+  // 预测板的局部 x 轴是板到车心的内向方向，因此 x 为板厚，y/z 为板宽高
   marker.scale.x = 0.01;
   marker.scale.y = 0.135;
   marker.scale.z = 0.056;
@@ -311,7 +311,7 @@ AimPredictorNode::MeasurementsById AimPredictorNode::collectMeasurements(
     }
     const Eigen::Vector3d armor_position(position.x, position.y, position.z);
     Eigen::Vector3d visible_normal = *normal;
-    // 平面 PnP 的法向正负没有业务语义。统一为由装甲板指向拍摄相机的可见面法向。
+    // 平面 PnP 的法向正负没有业务语义。统一为由装甲板指向拍摄相机的可见面法向
     if (visible_normal.dot(*camera_position - armor_position) < 0.0) {
       visible_normal = -visible_normal;
     }

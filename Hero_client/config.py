@@ -1,5 +1,5 @@
 MQTT_CONFIG = {
-    "broker": "192.168.12.1",
+    "broker": "127.0.0.1",
     "mqtt_port": 3333,
     "client_id": "101",
 

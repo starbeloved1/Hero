@@ -26,7 +26,7 @@ public:
   bool start(const std::string &port_name, int baud_rate, bool verify_crc);
   void stop();
   bool write(const LegacyWriteCommand &command);
-  // 供同一串口上的旧反基地协议复用；调用者负责其上层帧边界与时序。
+  // 供同一串口上的旧反基地协议复用；调用者负责其上层帧边界与时序
   bool writeRaw(const uint8_t *data, std::size_t size);
   bool isVirtual() const;
   void setReadCallback(ReadCallback callback);

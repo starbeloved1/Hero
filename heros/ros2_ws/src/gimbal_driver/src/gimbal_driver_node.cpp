@@ -1,8 +1,16 @@
 #include "gimbal_driver/gimbal_driver_node.hpp"
 
+#include <arpa/inet.h>
+
+#include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
+#include <cstring>
+#include <netinet/in.h>
 #include <stdexcept>
+#include <sys/socket.h>
+#include <unistd.h>
 #include <utility>
 
 #include "gimbal_driver/antibase_protocol.hpp"
@@ -63,6 +71,11 @@ GimbalDriverNode::GimbalDriverNode()
   declare_parameter<double>("antibase_min_packet_gap_ms", 21.0);
   declare_parameter<double>("antibase_chunk_gap_ms", 2.0);
   declare_parameter<int>("antibase_queue_depth", 64);
+  // 仅用于本地裁判模拟：镜像最终已经串口分片成功的完整 300B 逻辑包
+  // 正式车端保持 false，UDP 不属于比赛串口链路
+  declare_parameter<bool>("antibase_udp_mirror_enabled", false);
+  declare_parameter<std::string>("antibase_udp_mirror_host", "127.0.0.1");
+  declare_parameter<int>("antibase_udp_mirror_port", 9999);
 
   const auto state_rate = get_parameter("state_publish_rate_hz").as_double();
   const auto command_rate = get_parameter("command_send_rate_hz").as_double();
@@ -92,6 +105,20 @@ GimbalDriverNode::GimbalDriverNode()
   antibase_chunk_gap_ = std::chrono::duration_cast<std::chrono::nanoseconds>(
       std::chrono::duration<double, std::milli>(antibase_chunk_gap_ms));
   antibase_queue_depth_ = static_cast<std::size_t>(antibase_queue_depth);
+  antibase_udp_mirror_enabled_ =
+      get_parameter("antibase_udp_mirror_enabled").as_bool();
+  antibase_udp_mirror_host_ =
+      get_parameter("antibase_udp_mirror_host").as_string();
+  const auto antibase_udp_mirror_port =
+      get_parameter("antibase_udp_mirror_port").as_int();
+  if (antibase_udp_mirror_enabled_ &&
+      (antibase_udp_mirror_host_.empty() || antibase_udp_mirror_port <= 0 ||
+       antibase_udp_mirror_port > 65535)) {
+    throw std::invalid_argument("反基地 UDP 镜像主机或端口无效");
+  }
+  antibase_udp_mirror_port_ =
+      static_cast<uint16_t>(std::max<int64_t>(0, antibase_udp_mirror_port));
+  initializeAntiBaseUdpMirror();
   enable_fire_ = get_parameter("enable_fire").as_bool();
   command_flag_ = static_cast<uint8_t>(command_flag);
   gimbal_frame_id_ = get_parameter("gimbal_frame_id").as_string();
@@ -159,6 +186,7 @@ GimbalDriverNode::~GimbalDriverNode() {
   if (antibase_send_thread_.joinable()) {
     antibase_send_thread_.join();
   }
+  closeAntiBaseUdpMirror();
   serial_port_->stop();
 }
 
@@ -193,7 +221,7 @@ void GimbalDriverNode::publishState() {
     std::lock_guard<std::mutex> lock(state_mutex_);
     state = latest_state_;
     if (latest_state_.has_value()) {
-      // 旧接口对一次曝光边沿只消费一次，不能因为状态发布频率高于串口接收频率而重复发布。
+      // 旧接口对一次曝光边沿只消费一次，不能因为状态发布频率高于串口接收频率而重复发布
       latest_state_->exposure_step = 0;
     }
   }
@@ -373,10 +401,76 @@ void GimbalDriverNode::sendAntiBaseLoop() {
       }
     }
     if (sent) {
+      // 镜像只在五个串口分片均已写成功后触发。它既不参与限速，也不影响
+      // 正式串口路径；本地裁判模拟器据此收到一个完整 300B 逻辑包
+      mirrorAntiBasePacket(packet);
       antibase_sent_packets_.fetch_add(1U);
     } else {
       antibase_dropped_packets_.fetch_add(1U);
     }
+  }
+}
+
+void GimbalDriverNode::initializeAntiBaseUdpMirror() {
+  if (!antibase_udp_mirror_enabled_) {
+    return;
+  }
+
+  sockaddr_in destination{};
+  destination.sin_family = AF_INET;
+  if (inet_pton(AF_INET, antibase_udp_mirror_host_.c_str(),
+                &destination.sin_addr) != 1) {
+    throw std::invalid_argument("反基地 UDP 镜像仅支持有效 IPv4 地址");
+  }
+  antibase_udp_mirror_fd_ = ::socket(AF_INET, SOCK_DGRAM, 0);
+  if (antibase_udp_mirror_fd_ < 0) {
+    throw std::runtime_error("无法创建反基地 UDP 镜像 socket");
+  }
+  RCLCPP_WARN(get_logger(),
+              "反基地本地 UDP 镜像已启用：最终 300B 包将发送至 %s:%u；不要在实车启用",
+              antibase_udp_mirror_host_.c_str(), antibase_udp_mirror_port_);
+}
+
+void GimbalDriverNode::closeAntiBaseUdpMirror() {
+  if (antibase_udp_mirror_fd_ >= 0) {
+    ::close(antibase_udp_mirror_fd_);
+    antibase_udp_mirror_fd_ = -1;
+  }
+}
+
+void GimbalDriverNode::mirrorAntiBasePacket(
+    const hero_msgs::msg::AntiBasePacket &packet) {
+  if (!antibase_udp_mirror_enabled_ || antibase_udp_mirror_fd_ < 0) {
+    return;
+  }
+
+  std::array<uint8_t, kAntiBasePacketBytes> payload{};
+  static_assert(sizeof(packet.sequence_id) == 8U,
+                "反基地序号必须是 8 字节");
+  std::memcpy(payload.data(), &packet.sequence_id, sizeof(packet.sequence_id));
+  std::copy(packet.data.begin(), packet.data.end(), payload.begin() + 8);
+
+  sockaddr_in destination{};
+  destination.sin_family = AF_INET;
+  destination.sin_port = htons(antibase_udp_mirror_port_);
+  const auto parsed = inet_pton(AF_INET, antibase_udp_mirror_host_.c_str(),
+                                &destination.sin_addr);
+  if (parsed != 1) {
+    ++antibase_udp_mirror_send_failures_;
+    RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 2000,
+                          "反基地 UDP 镜像地址失效：%s",
+                          antibase_udp_mirror_host_.c_str());
+    return;
+  }
+  const auto sent = ::sendto(
+      antibase_udp_mirror_fd_, payload.data(), payload.size(), 0,
+      reinterpret_cast<const sockaddr *>(&destination), sizeof(destination));
+  if (sent != static_cast<ssize_t>(payload.size())) {
+    ++antibase_udp_mirror_send_failures_;
+    RCLCPP_WARN_THROTTLE(
+        get_logger(), *get_clock(), 2000,
+        "反基地 UDP 镜像发送失败：%zd/%zu B（累计失败 %lu）", sent,
+        payload.size(), antibase_udp_mirror_send_failures_);
   }
 }
 

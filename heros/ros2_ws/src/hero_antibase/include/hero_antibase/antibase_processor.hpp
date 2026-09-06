@@ -88,7 +88,7 @@ public:
   // 2. preprocess()完成裁剪、缩放、背景/运动检测、静态简化和拖影预处理
   // 3. encode()使用 x264 编码为 H.264 字节流，追加至内部码流缓存；
   // 4. popPackets()按串口可用带宽将缓存切为 292B 数据包，并在积压超限时裁剪旧码流；
-  // 5. updateBitrate()依据 gimbal_driver 的发送队列反馈调节下一周期编码码率。
+  // 5. updateBitrate()依据 gimbal_driver 的发送队列反馈调节下一周期编码码率
   ProcessorResult process(const cv::Mat &image, const TxFeedback &feedback);
   void reset();
 
@@ -115,7 +115,7 @@ private:
   uint64_t sequence_id_{0U};
   // 编码线程只按此节拍向发送侧准入逻辑包；真正的串口起始间隔仍由
   // gimbal_driver 发送线程兜底。不能用整秒字节窗口，否则目标间隔会被
-  // 向下取整成 49 pps，且会在每秒开始突发一批包。
+  // 向下取整成 49 pps，且会在每秒开始突发一批包
   int64_t next_packet_admit_ns_{0};
   int current_bitrate_kbps_{0};
   int64_t last_encode_ns_{0};

@@ -92,7 +92,7 @@ void CommandMuxNode::receiveGimbalState(
   std::lock_guard<std::mutex> lock(mutex_);
   if (latest_gimbal_state_.has_value() &&
       latest_gimbal_state_->mode != message->mode) {
-    // 模式切换后不复用切换前缓存的任何候选，必须等待新模式重新产生控制。
+    // 模式切换后不复用切换前缓存的任何候选，必须等待新模式重新产生控制
     candidates_.fill(std::nullopt);
   }
   latest_gimbal_state_ = *message;
@@ -142,7 +142,7 @@ void CommandMuxNode::publishSelectedCommand() {
   }
 
   if (state->mode == hero_msgs::msg::GimbalState::MODE_ANTI_BASE) {
-    // mode4 的串口只承载反基地码流，连保持角度控制帧也不发布。
+    // mode4 的串口只承载反基地码流，连保持角度控制帧也不发布
     return;
   }
   auto output = makeSafeCommand(*state, publish_time);
@@ -151,7 +151,7 @@ void CommandMuxNode::publishSelectedCommand() {
     if (isFresh(candidate_time.seconds(), publish_time.seconds(),
                 max_command_age_sec_)) {
       output = candidate->command;
-      // 控制帧表示本次仲裁后立即送往下位机的命令，时间戳写为本次输出时刻。
+      // 控制帧表示本次仲裁后立即送往下位机的命令，时间戳写为本次输出时刻
       output.header.stamp = publish_time;
     }
   }

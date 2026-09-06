@@ -16,7 +16,7 @@ namespace
 
 cv::Scalar colorForDetection(int color)
 {
-  // OpenCV 使用 BGR 顺序；0=蓝色、1=红色，其他模型颜色使用黄色提示。
+  // OpenCV 使用 BGR 顺序；0=蓝色、1=红色，其他模型颜色使用黄色提示
   if (color == 0) {
     return cv::Scalar(255, 100, 0);
   }

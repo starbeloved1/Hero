@@ -29,13 +29,13 @@ struct ArmorPoseEstimate
   bool success{false};
 };
 
-// 保持旧 Hero 的约定：只有英雄（ID 1）使用大装甲板尺寸。
+// 保持旧 Hero 的约定：只有英雄（ID 1）使用大装甲板尺寸
 ArmorSize armorSizeForId(std::uint8_t id);
 
-// 返回与旧 Solver 一致的装甲板物体角点顺序。
+// 返回与旧 Solver 一致的装甲板物体角点顺序
 const std::vector<cv::Point3f> & armorObjectPoints(ArmorSize size);
 
-// 使用 IPPE 求解平面装甲板的全部候选位姿，并选择正深度且重投影误差最小者。
+// 使用 IPPE 求解平面装甲板的全部候选位姿，并选择正深度且重投影误差最小者
 ArmorPoseEstimate solveArmorPnP(
   const std::array<cv::Point2f, 4> & image_points,
   ArmorSize size,
