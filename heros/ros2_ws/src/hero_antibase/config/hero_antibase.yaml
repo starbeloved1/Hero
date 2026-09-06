@@ -16,7 +16,9 @@ hero_antibase_node:
     # antibase 编码节拍和传输约束
     output_fps: 30
     max_tx_delay_sec: 0.5
-    min_packet_gap_ms: 22.0
+    # 官方判定相邻完整包必须严格大于 20 ms。21 ms 对应约 47.62 Hz；
+    # 真正串口起始节拍由 gimbal_driver 再次强制执行。
+    min_packet_gap_ms: 21.0
     adaptive_bitrate_enabled: true
     adaptive_bitrate_min_kbps: 90
     adaptive_bitrate_max_kbps: 160

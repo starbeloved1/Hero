@@ -37,7 +37,7 @@ struct AntiBaseConfig {
   bool force_monochrome{false};
   int target_bitrate_kbps{130};
   double max_tx_delay_sec{0.5};
-  double min_packet_gap_ms{22.0};
+  double min_packet_gap_ms{21.0};
   bool adaptive_bitrate_enabled{true};
   int adaptive_bitrate_min_kbps{90};
   int adaptive_bitrate_max_kbps{160};
@@ -110,18 +110,20 @@ private:
   bool motion_initialized_{false};
   bool global_motion_active_{false};
   std::vector<uint8_t> stream_buffer_;
-  std::deque<std::pair<int64_t, std::size_t>> send_window_;
-  std::size_t send_window_bytes_{0U};
   std::size_t max_backlog_bytes_{0U};
-  std::size_t window_limit_bytes_{0U};
   uint64_t dropped_bytes_{0U};
   uint64_t sequence_id_{0U};
+  // 编码线程只按此节拍向发送侧准入逻辑包；真正的串口起始间隔仍由
+  // gimbal_driver 发送线程兜底。不能用整秒字节窗口，否则目标间隔会被
+  // 向下取整成 49 pps，且会在每秒开始突发一批包。
+  int64_t next_packet_admit_ns_{0};
   int current_bitrate_kbps_{0};
   int64_t last_encode_ns_{0};
   int64_t last_control_ns_{0};
   int64_t last_feedback_ns_{0};
   uint64_t last_sent_packets_{0U};
   uint64_t encoded_bytes_since_control_{0U};
+  uint64_t last_control_dropped_bytes_{0U};
 
   struct GstState;
   GstState *gst_{nullptr};

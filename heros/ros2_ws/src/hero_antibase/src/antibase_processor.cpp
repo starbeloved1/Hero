@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstring>
 #include <stdexcept>
+#include <vector>
 
 #include <gst/app/gstappsink.h>
 #include <gst/app/gstappsrc.h>
@@ -40,10 +41,8 @@ AntiBaseProcessor::AntiBaseProcessor(AntiBaseConfig config)
     throw std::invalid_argument(
         "反基地输出帧率、尺寸必须为正，完整包间隔必须大于 20 ms");
   }
-  const auto bytes_per_second =
-      static_cast<double>(kPacketBytes) / config_.min_packet_gap_ms * 1000.0;
-  window_limit_bytes_ =
-      static_cast<std::size_t>(std::max(1.0, bytes_per_second));
+  const auto bytes_per_second = static_cast<double>(kPacketBytes) /
+                                config_.min_packet_gap_ms * 1000.0;
   max_backlog_bytes_ = static_cast<std::size_t>(std::max(
       1.0, bytes_per_second * std::max(0.01, config_.max_tx_delay_sec)));
   initializeEncoder();
@@ -64,15 +63,15 @@ void AntiBaseProcessor::reset() {
   motion_initialized_ = false;
   global_motion_active_ = false;
   stream_buffer_.clear();
-  send_window_.clear();
-  send_window_bytes_ = 0U;
   dropped_bytes_ = 0U;
   sequence_id_ = 0U;
+  next_packet_admit_ns_ = 0;
   last_encode_ns_ = 0;
   last_control_ns_ = 0;
   last_feedback_ns_ = 0;
   last_sent_packets_ = 0U;
   encoded_bytes_since_control_ = 0U;
+  last_control_dropped_bytes_ = 0U;
   shutdownEncoder();
   initializeEncoder();
 }
@@ -215,8 +214,16 @@ cv::Mat AntiBaseProcessor::preprocess(const cv::Mat &image,
         cv::max(trail_image, trail_frames_[index], trail_image);
       }
       if (config_.trail_brightness_gain > 1.0) {
-        trail_image.convertTo(trail_image, CV_8U,
-                              std::min(3.0, config_.trail_brightness_gain));
+        // 与 26hero 一致：只提亮 Y，不能把 BGR 三通道同时放大而改变色相。
+        cv::Mat ycrcb;
+        cv::cvtColor(trail_image, ycrcb, cv::COLOR_BGR2YCrCb);
+        std::vector<cv::Mat> channels;
+        cv::split(ycrcb, channels);
+        channels[0].convertTo(
+            channels[0], CV_8U,
+            std::clamp(config_.trail_brightness_gain, 1.0, 3.0));
+        cv::merge(channels, ycrcb);
+        cv::cvtColor(ycrcb, trail_image, cv::COLOR_YCrCb2BGR);
       }
       trail_image.copyTo(focused, trail_mask);
     }
@@ -227,13 +234,15 @@ cv::Mat AntiBaseProcessor::preprocess(const cv::Mat &image,
 std::vector<Packet> AntiBaseProcessor::popPackets() {
   std::vector<Packet> result;
   const auto now = steadyNowNs();
-  while (!send_window_.empty() &&
-         now - send_window_.front().first > 1000000000LL) {
-    send_window_bytes_ -= send_window_.front().second;
-    send_window_.pop_front();
+  const auto gap_ns = static_cast<int64_t>(
+      std::chrono::duration<double, std::milli>(config_.min_packet_gap_ms)
+          .count() *
+      1000000.0);
+  if (next_packet_admit_ns_ == 0) {
+    next_packet_admit_ns_ = now;
   }
   while (stream_buffer_.size() >= kPacketPayloadBytes &&
-         send_window_bytes_ + kPacketBytes <= window_limit_bytes_) {
+         now >= next_packet_admit_ns_) {
     Packet packet;
     packet.sequence_id = sequence_id_++;
     std::copy_n(stream_buffer_.begin(), kPacketPayloadBytes,
@@ -242,8 +251,7 @@ std::vector<Packet> AntiBaseProcessor::popPackets() {
                          stream_buffer_.begin() +
                              static_cast<std::ptrdiff_t>(kPacketPayloadBytes));
     result.push_back(packet);
-    send_window_.emplace_back(now, kPacketBytes);
-    send_window_bytes_ += kPacketBytes;
+    next_packet_admit_ns_ += std::max<int64_t>(1, gap_ns);
   }
   if (stream_buffer_.size() > max_backlog_bytes_) {
     auto drop = stream_buffer_.size() - max_backlog_bytes_;
@@ -278,34 +286,62 @@ void AntiBaseProcessor::updateBitrate(const TxFeedback &feedback) {
     last_control_ns_ = now;
     last_feedback_ns_ = now;
     last_sent_packets_ = feedback.sent_packets;
+    last_control_dropped_bytes_ = dropped_bytes_;
     return;
   }
-  if (now - last_control_ns_ <
-      static_cast<int64_t>(config_.adaptive_bitrate_control_interval_sec *
-                           1e9)) {
+  const auto interval_ns = static_cast<int64_t>(
+      std::max(0.2, config_.adaptive_bitrate_control_interval_sec) * 1e9);
+  if (now - last_control_ns_ < interval_ns) {
     return;
   }
+  const auto elapsed_s = std::max(
+      0.001, static_cast<double>(now - last_feedback_ns_) / 1e9);
+  const auto sent_delta = feedback.sent_packets >= last_sent_packets_
+                              ? feedback.sent_packets - last_sent_packets_
+                              : 0U;
+  const auto tx_pps = static_cast<double>(sent_delta) / elapsed_s;
+  const auto encoded_kbps = static_cast<double>(encoded_bytes_since_control_) *
+                            8.0 / 1000.0 / elapsed_s;
+  const auto full_pps = 1000.0 / config_.min_packet_gap_ms;
+  // H.264 可用净载荷不包含 8B 序号：292B * 49.75Hz = 116.2kbps。
+  const auto h264_capacity_kbps =
+      static_cast<double>(kPacketPayloadBytes) * 8.0 /
+      config_.min_packet_gap_ms;
+  const bool queue_hard =
+      feedback.pending_packets >= 8U ||
+      feedback.oldest_pending_ms >= config_.min_packet_gap_ms * 8.0;
+  const bool queue_high =
+      feedback.pending_packets >= 4U ||
+      feedback.oldest_pending_ms >= config_.min_packet_gap_ms * 4.0;
+  const bool limiter_hard = dropped_bytes_ > last_control_dropped_bytes_ ||
+                            stream_buffer_.size() >=
+                                kPacketPayloadBytes * 8U;
+  const bool limiter_high =
+      stream_buffer_.size() >= kPacketPayloadBytes * 4U;
   int next = current_bitrate_kbps_;
-  if (feedback.pending_packets >= 8U ||
-      feedback.oldest_pending_ms >= config_.min_packet_gap_ms * 8.0) {
+  if (queue_hard || limiter_hard) {
     next -= 2 * config_.adaptive_bitrate_step_down_kbps;
-  } else if (feedback.pending_packets >= 4U ||
-             stream_buffer_.size() >= 4U * kPacketPayloadBytes) {
+  } else if (queue_high || limiter_high) {
     next -= config_.adaptive_bitrate_step_down_kbps;
-  } else if (feedback.pending_packets <= 1U &&
-             stream_buffer_.size() < kPacketPayloadBytes) {
+  } else if (tx_pps < full_pps * 0.95 &&
+             encoded_kbps < h264_capacity_kbps * 0.98 &&
+             feedback.pending_packets <= 1U &&
+             feedback.oldest_pending_ms < config_.min_packet_gap_ms) {
     next += config_.adaptive_bitrate_step_up_kbps;
   }
   next = std::clamp(next, config_.adaptive_bitrate_min_kbps,
                     config_.adaptive_bitrate_max_kbps);
-  if (next != current_bitrate_kbps_ && gst_->encoder != nullptr) {
-    g_object_set(G_OBJECT(gst_->encoder), "bitrate", next, nullptr);
+  if (next != current_bitrate_kbps_) {
+    if (gst_->encoder != nullptr) {
+      g_object_set(G_OBJECT(gst_->encoder), "bitrate", next, nullptr);
+    }
     current_bitrate_kbps_ = next;
   }
   last_control_ns_ = now;
   last_feedback_ns_ = now;
   last_sent_packets_ = feedback.sent_packets;
   encoded_bytes_since_control_ = 0U;
+  last_control_dropped_bytes_ = dropped_bytes_;
 }
 
 void AntiBaseProcessor::initializeEncoder() {
@@ -314,6 +350,7 @@ void AntiBaseProcessor::initializeEncoder() {
   gst_->appsrc = gst_element_factory_make("appsrc", "source");
   auto *convert = gst_element_factory_make("videoconvert", "convert");
   gst_->encoder = gst_element_factory_make("x264enc", "encoder");
+  auto *parser = gst_element_factory_make("h264parse", "parser");
   gst_->appsink = gst_element_factory_make("appsink", "sink");
   if (!gst_->pipeline || !gst_->appsrc || !convert || !gst_->encoder ||
       !gst_->appsink) {
@@ -323,8 +360,9 @@ void AntiBaseProcessor::initializeEncoder() {
       "video/x-raw", "format", G_TYPE_STRING, "BGR", "width", G_TYPE_INT,
       config_.output_size, "height", G_TYPE_INT, config_.output_size,
       "framerate", GST_TYPE_FRACTION, config_.output_fps, 1, nullptr);
-  g_object_set(G_OBJECT(gst_->appsrc), "caps", input_caps, "is-live", TRUE,
-               "format", GST_FORMAT_TIME, "do-timestamp", TRUE, nullptr);
+  g_object_set(G_OBJECT(gst_->appsrc), "caps", input_caps, "stream-type", 0,
+               "is-live", TRUE, "format", GST_FORMAT_TIME, "do-timestamp",
+               TRUE, nullptr);
   gst_caps_unref(input_caps);
   g_object_set(G_OBJECT(gst_->encoder), "bitrate", current_bitrate_kbps_,
                "speed-preset", config_.h264_speed_preset, "tune",
@@ -335,12 +373,31 @@ void AntiBaseProcessor::initializeEncoder() {
                config_.h264_sliced_threads, "ref", config_.h264_ref, "aud",
                TRUE, "vbv-buf-capacity", config_.h264_vbv_buf_capacity,
                "option-string", config_.h264_option_string.c_str(), nullptr);
-  g_object_set(G_OBJECT(gst_->appsink), "max-buffers", 2, "drop", TRUE, "sync",
-               FALSE, nullptr);
+  if (parser != nullptr) {
+    g_object_set(G_OBJECT(parser), "config-interval", -1,
+                 "disable-passthrough", TRUE, nullptr);
+  }
+  auto *h264_caps = gst_caps_new_simple(
+      "video/x-h264", "stream-format", G_TYPE_STRING, "byte-stream",
+      "alignment", G_TYPE_STRING, "au", nullptr);
+  g_object_set(G_OBJECT(gst_->appsink), "caps", h264_caps, "max-buffers", 2,
+               "drop", TRUE, "emit-signals", FALSE, "sync", FALSE, nullptr);
+  gst_caps_unref(h264_caps);
   gst_bin_add_many(GST_BIN(gst_->pipeline), gst_->appsrc, convert,
-                   gst_->encoder, gst_->appsink, nullptr);
-  if (!gst_element_link_many(gst_->appsrc, convert, gst_->encoder,
-                             gst_->appsink, nullptr) ||
+                   gst_->encoder, nullptr);
+  if (parser != nullptr) {
+    gst_bin_add_many(GST_BIN(gst_->pipeline), parser, gst_->appsink, nullptr);
+  } else {
+    gst_bin_add_many(GST_BIN(gst_->pipeline), gst_->appsink, nullptr);
+  }
+  const bool linked = parser != nullptr
+                          ? gst_element_link_many(gst_->appsrc, convert,
+                                                  gst_->encoder, parser,
+                                                  gst_->appsink, nullptr)
+                          : gst_element_link_many(gst_->appsrc, convert,
+                                                  gst_->encoder, gst_->appsink,
+                                                  nullptr);
+  if (!linked ||
       gst_element_set_state(gst_->pipeline, GST_STATE_PLAYING) ==
           GST_STATE_CHANGE_FAILURE) {
     throw std::runtime_error("无法启动 GStreamer x264 反基地编码管线");

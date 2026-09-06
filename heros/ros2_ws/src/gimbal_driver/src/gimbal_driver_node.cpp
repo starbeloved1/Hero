@@ -45,7 +45,7 @@ GimbalDriverNode::GimbalDriverNode()
     : Node("gimbal_driver_node"), serial_port_(std::make_unique<SerialPort>()) {
   //节点参数
   declare_parameter<std::string>("port_name", "/dev/ttyACM0");
-  declare_parameter<int>("baud_rate", 115200);
+  declare_parameter<int>("baud_rate", 1000000);
   declare_parameter<bool>("enable_crc_check", true);
   declare_parameter<bool>("enable_fire", false);
   declare_parameter<int>("command_flag", 0x05);
@@ -60,7 +60,7 @@ GimbalDriverNode::GimbalDriverNode()
                                  "/hero/aim/antibase/packets");
   declare_parameter<std::string>("antibase_tx_status_topic",
                                  "/hero/aim/antibase/tx_status");
-  declare_parameter<double>("antibase_min_packet_gap_ms", 22.0);
+  declare_parameter<double>("antibase_min_packet_gap_ms", 21.0);
   declare_parameter<double>("antibase_chunk_gap_ms", 2.0);
   declare_parameter<int>("antibase_queue_depth", 64);
 
@@ -344,9 +344,22 @@ void GimbalDriverNode::sendAntiBaseLoop() {
       antibase_dropped_packets_.fetch_add(1U);
       continue;
     }
-    last_packet_start = std::chrono::steady_clock::now();
+    const auto packet_start = std::chrono::steady_clock::now();
     {
       std::lock_guard<std::mutex> lock(antibase_mutex_);
+      if (last_packet_start.has_value()) {
+        const auto gap_ms = std::chrono::duration<float, std::milli>(
+                                packet_start - *last_packet_start)
+                                .count();
+        antibase_last_packet_gap_ms_ = gap_ms;
+        if (gap_ms <= 20.0F) {
+          ++antibase_gap_violation_count_;
+          RCLCPP_ERROR(get_logger(),
+                       "反基地完整包间隔 %.3f ms，不满足严格大于 20 ms 的要求",
+                       gap_ms);
+        }
+      }
+      last_packet_start = packet_start;
       antibase_last_send_stamp_ = now();
     }
     const auto chunks = encodeAntiBasePacket(packet);
@@ -375,7 +388,23 @@ void GimbalDriverNode::publishAntiBaseTxStatus() {
   status.dropped_packets = antibase_dropped_packets_.load();
   {
     std::lock_guard<std::mutex> lock(antibase_mutex_);
+    const auto status_now = std::chrono::steady_clock::now();
+    if (antibase_last_status_time_.time_since_epoch().count() != 0) {
+      const auto elapsed_s =
+          std::chrono::duration<float>(status_now - antibase_last_status_time_)
+              .count();
+      const auto sent_delta = status.sent_packets >= antibase_last_status_sent_packets_
+                                  ? status.sent_packets - antibase_last_status_sent_packets_
+                                  : 0U;
+      status.tx_rate_hz = elapsed_s > 0.0F
+                              ? static_cast<float>(sent_delta) / elapsed_s
+                              : 0.0F;
+    }
+    antibase_last_status_time_ = status_now;
+    antibase_last_status_sent_packets_ = status.sent_packets;
     status.last_send_stamp = antibase_last_send_stamp_;
+    status.last_packet_gap_ms = antibase_last_packet_gap_ms_;
+    status.packet_gap_violation_count = antibase_gap_violation_count_;
     status.pending_packets = static_cast<uint32_t>(antibase_packets_.size());
     if (!antibase_packets_.empty()) {
       status.oldest_pending_ms = static_cast<float>(

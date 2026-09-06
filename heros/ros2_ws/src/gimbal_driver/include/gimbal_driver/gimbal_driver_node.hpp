@@ -80,6 +80,10 @@ private:
   std::atomic<uint8_t> current_mode_{hero_msgs::msg::GimbalState::MODE_NORMAL};
   std::atomic<uint64_t> antibase_sent_packets_{0U};
   std::atomic<uint64_t> antibase_dropped_packets_{0U};
+  uint64_t antibase_gap_violation_count_{0U};
+  float antibase_last_packet_gap_ms_{0.0F};
+  uint64_t antibase_last_status_sent_packets_{0U};
+  std::chrono::steady_clock::time_point antibase_last_status_time_{};
   std::optional<rclcpp::Time> antibase_last_send_time_;
   rclcpp::Time antibase_last_send_stamp_{0, 0, RCL_ROS_TIME};
   std::chrono::nanoseconds antibase_min_packet_gap_{0};

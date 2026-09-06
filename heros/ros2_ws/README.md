@@ -116,6 +116,6 @@ mode 3 的 `aim_predictor` 与 `aim_auto` 默认会在模式 3 下计算、发�
 
 ## Mode4 反基地
 
-云台状态切到 `mode: 4` 后，`camera_router` 将基地相机切到 selected，`hero_antibase` 开始生成 H.264 码流逻辑包，`gimbal_driver` 自动按旧协议写入真实串口：每个逻辑包为 8B 小端序号加 292B H.264 数据，拆成 5 个 `'#' + 分片序号 + 60B + CRC16` 的 64B 帧，分片间隔 2 ms，完整包起始间隔为 22 ms。
+云台状态切到 `mode: 4` 后，`camera_router` 将基地相机切到 selected，`hero_antibase` 开始生成 H.264 码流逻辑包，`gimbal_driver` 自动按旧协议写入真实串口：每个逻辑包为 8B 小端序号加 292B H.264 数据，拆成 5 个 `'#' + 分片序号 + 60B + CRC16` 的 64B 帧，分片间隔 2 ms，完整包起始间隔为 21 ms（约 47.62 Hz）。反基地要求使用 1 Mbaud 串口；320 个实际串口字节在 115200 baud 下至少需要约 27.8 ms，物理上无法达到 50 Hz。
 
-`/hero/aim/antibase/packets.header.stamp` 始终是源图像时刻 `T0`；`/hero/aim/antibase/tx_status.last_send_stamp` 是实际串口开始发送时刻 `Tsend`。Foxglove 可查看 `/hero/aim/antibase/debug` 的编码字节数、码率、运动比例、缓存和丢包统计。将 `hero_antibase.yaml` 的 `visualization_enabled` 设为 `true` 后，可在 `/hero/aim/antibase/visualization` 查看实际送入编码器的 320×320 预处理图像。UDP/MQTT 本地调试镜像尚未迁移。
+`/hero/aim/antibase/packets.header.stamp` 始终是源图像时刻 `T0`；`/hero/aim/antibase/tx_status.last_send_stamp` 是实际串口开始发送时刻 `Tsend`。Foxglove 可查看 `/hero/aim/antibase/debug` 的编码字节数、码率、运动比例、缓存和丢包统计；`tx_status.tx_rate_hz`、`last_packet_gap_ms` 与 `packet_gap_violation_count` 分别用于确认实际频率、最近完整包间隔和是否出现过不合规间隔。将 `hero_antibase.yaml` 的 `visualization_enabled` 设为 `true` 后，可在 `/hero/aim/antibase/visualization` 查看实际送入编码器的 320×320 预处理图像。UDP/MQTT 本地调试镜像尚未迁移。
