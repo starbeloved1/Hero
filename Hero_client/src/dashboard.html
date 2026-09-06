@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>HUSTLY-HERO Competition Client</title>
+  <style>
+    :root{color-scheme:dark;--bg:#06080a;--panel:rgba(12,16,20,.88);--line:#283039;--text:#eef3f5;--muted:#8e9aa3;--ok:#2fd17c;--warn:#f0b84f;--bad:#ff5b5f;--blue:#56c7ff}
+    *{box-sizing:border-box}html,body{width:100%;height:100%;margin:0;background:var(--bg);color:var(--text);font-family:Inter,Segoe UI,sans-serif;overflow:hidden}
+    button{border:1px solid var(--line);background:#151b20;color:var(--text);padding:8px 12px;font-weight:700;cursor:pointer;border-radius:4px}
+    button:hover{border-color:var(--blue);background:#1b242b}button:disabled{opacity:.4;cursor:wait}.danger{border-color:#693238}.primary{border-color:#246187;background:#12354a}
+    .app{height:100%;display:grid;grid-template-rows:auto 1fr auto;gap:10px;padding:10px}
+    .topbar,.footer{background:var(--panel);border:1px solid var(--line);display:flex;align-items:center;gap:10px;padding:9px 12px}
+    .brand{font-weight:850;letter-spacing:.04em;margin-right:auto}.muted{color:var(--muted);font-size:12px}.health{display:flex;gap:6px;align-items:center}.health span{border:1px solid var(--line);padding:5px 7px;font-size:11px;font-weight:700;border-radius:999px}.health .ok{border-color:#266846}.health .warn{border-color:#765c25}.health .bad{border-color:#693238}
+    .workspace{position:relative;min-height:0;border:1px solid var(--line);background:#000;overflow:hidden}
+    .stream{position:absolute;background:#000;border:1px solid var(--line);overflow:hidden;cursor:pointer}
+    .stream img{width:100%;height:100%;object-fit:contain;display:block}
+    .grid{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2}.grid path{fill:none;stroke:#00d25a;stroke-width:1;vector-effect:non-scaling-stroke;opacity:.85;shape-rendering:crispEdges}.grid.hidden{display:none}
+    .deployment-cross{display:none;position:absolute;inset:0;z-index:3;place-items:center;pointer-events:none}.deployment-cross.show{display:grid}.deployment-cross svg{width:min(42%,340px);height:auto;filter:drop-shadow(0 4px 14px rgba(0,0,0,.72))}.deployment-cross .ring{fill:rgba(27,8,10,.46);stroke:rgba(255,91,95,.52);stroke-width:3}.deployment-cross .mark{fill:none;stroke:#ff5b5f;stroke-width:9;stroke-linecap:round}.deployment-cross .highlight{fill:none;stroke:rgba(255,224,224,.34);stroke-width:2;stroke-linecap:round}
+    .stream.main img{object-position:5% center}
+    .stream.main{inset:0}.stream.pip{right:16px;bottom:16px;width:min(34vw,520px);height:min(30vh,300px);z-index:3;box-shadow:0 10px 36px #000}
+    .label{position:absolute;left:10px;top:10px;background:rgba(0,0,0,.72);border:1px solid var(--line);padding:6px 9px;font-size:12px;font-weight:800;z-index:4}
+    .state{margin-left:8px}.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}
+    .panels{position:absolute;right:10px;top:10px;z-index:5;display:grid;gap:8px;width:164px;pointer-events:none}
+    .card{background:var(--panel);border:1px solid var(--line);padding:8px 10px}.card h3{font-size:12px;margin:0 0 5px}.metric{display:flex;justify-content:space-between;font-size:11px;line-height:1.65}.metric span{color:var(--muted)}
+    .footer{flex-wrap:wrap}.group{display:flex;align-items:center;gap:6px}.group strong{font-size:12px;margin-right:4px}.toast{margin-left:auto;color:var(--muted);font-size:12px;min-height:18px}.toast.bad{color:var(--bad)}
+    @media(max-width:760px){.panels{display:none}.stream.pip{width:42vw;height:25vh}.topbar{flex-wrap:wrap}.brand{width:100%}.footer{align-content:flex-start}.toast{width:100%;margin-left:0}}
+  </style>
+</head>
+<body>
+<main class="app">
+  <header class="topbar">
+    <div class="brand">HUSTLY-HERO 图传面板</div>
+    <div class="health"><span id="udpHeaderState" class="bad">UDP · STOPPED</span><span id="mqttHeaderState" class="bad">MQTT · STOPPED</span><span id="deployHeaderState" class="warn">部署 · 等待状态</span></div>
+    <button class="primary" data-control="all/start">启动全部</button>
+    <button data-control="all/restart">重启全部</button>
+    <button class="danger" data-control="all/stop">停止全部</button>
+    <button id="fullscreen" title="切换浏览器全屏">全屏</button>
+    <button id="udpPreview">UDP 画面：开</button>
+    <button id="mqttPreview">MQTT 画面：开</button>
+  </header>
+
+  <section class="workspace">
+    <div id="udpStream" class="stream">
+      <img id="udpImage" alt="UDP preview">
+      <div class="label">UDP / HEVC <span id="udpState" class="state">STOPPED</span></div>
+    </div>
+    <div id="mqttStream" class="stream">
+      <img id="mqttImage" alt="MQTT preview">
+      <svg id="mqttGridOverlay" class="grid" viewBox="0 0 6 6" preserveAspectRatio="none" aria-hidden="true"><path d="M1 0V6 M2 0V6 M3 0V6 M4 0V6 M5 0V6 M0 1H6 M0 2H6 M0 3H6 M0 4H6 M0 5H6"/></svg>
+      <div id="mqttUndeployedCross" class="deployment-cross" aria-label="未部署"><svg viewBox="0 0 100 100" role="img" aria-label="未部署"><circle class="ring" cx="50" cy="50" r="42"/><path class="mark" d="M34 34L66 66M66 34L34 66"/><path class="highlight" d="M31 31L69 69M69 31L31 69"/></svg></div>
+      <div class="label">MQTT / H264 <span id="mqttState" class="state">STOPPED</span></div>
+    </div>
+    <aside class="panels">
+      <div class="card"><h3>UDP / HEVC</h3>
+        <div class="metric"><span>解码</span><b id="udpFps">0 fps</b></div>
+        <div class="metric"><span>画面年龄</span><b id="udpAge">--</b></div>
+        <div class="metric"><span>丢弃</span><b id="udpDrop">0</b></div>
+      </div>
+      <div class="card"><h3>MQTT / H264</h3>
+        <div class="metric"><span>解码</span><b id="mqttFps">0 fps</b></div>
+        <div class="metric"><span>画面年龄</span><b id="mqttAge">--</b></div>
+        <div class="metric"><span>丢弃</span><b id="mqttDrop">0</b></div>
+      </div>
+    </aside>
+  </section>
+
+  <footer class="footer">
+    <div class="group">
+      <strong>UDP</strong>
+      <button data-control="udp/start">启动</button>
+      <button data-control="udp/restart">重启</button>
+      <button class="danger" data-control="udp/stop">停止</button>
+    </div>
+    <div class="group">
+      <strong>MQTT</strong>
+      <button data-control="mqtt/start">启动</button>
+      <button data-control="mqtt/restart">重启</button>
+      <button class="danger" data-control="mqtt/stop">停止</button>
+      <button id="mqttGridButton">网格：开</button>
+    </div>
+    <div class="group"><button id="cropMinus" title="向左调整">−</button><button id="cropPlus" title="向右调整">+</button></div>
+    <span class="muted">点击任一画面切换主画面</span>
+    <div class="health"><span id="damageState" class="bad">累计伤害 · --</span></div>
+    <span id="toast" class="toast" aria-live="polite"></span>
+  </footer>
+</main>
+
+<script>
+const STATUS_POLL_MS=__STATUS_POLL_MS__;
+const MQTT_FRAME_POLL_MS=__MQTT_FRAME_POLL_MS__;
+const UDP_FRAME_POLL_MS=__UDP_FRAME_POLL_MS__;
+let mainStream="__DEFAULT_MAIN_STREAM__";
+let udpPreviewEnabled=true;
+let mqttPreviewEnabled=true;
+const $=id=>document.getElementById(id);
+const fmt=n=>Number(n||0).toLocaleString();
+const age=v=>Number(v)>=0?Math.round(v)+" ms":"--";
+
+function applyLayout(){
+  if(!udpPreviewEnabled&&!mqttPreviewEnabled){
+    $("udpStream").style.display="none";
+    $("mqttStream").style.display="none";
+    requestAnimationFrame(fitMqttGrid);
+    return;
+  }
+  if(!udpPreviewEnabled&&mainStream==="udp")mainStream="mqtt";
+  if(!mqttPreviewEnabled&&mainStream==="mqtt")mainStream="udp";
+  $("udpStream").style.display=udpPreviewEnabled?"":"none";
+  $("mqttStream").style.display=mqttPreviewEnabled?"":"none";
+  $("udpStream").className="stream "+(udpPreviewEnabled&&(mainStream==="udp"||!mqttPreviewEnabled)?"main":"pip");
+  $("mqttStream").className="stream "+(mqttPreviewEnabled&&(mainStream==="mqtt"||!udpPreviewEnabled)?"main":"pip");
+  requestAnimationFrame(fitMqttGrid);
+}
+$("udpStream").onclick=()=>{if(udpPreviewEnabled){mainStream="udp";applyLayout()}};
+$("mqttStream").onclick=()=>{if(mqttPreviewEnabled){mainStream="mqtt";applyLayout()}};
+applyLayout();
+
+// JPEG 使用 contain 保持原始比例，网格必须只覆盖实际图像区域，不能覆盖两侧黑边。
+function fitMqttGrid(){
+  const image=$("mqttImage"),overlay=$("mqttGridOverlay"),stream=$("mqttStream");
+  if(!image.naturalWidth||!image.naturalHeight)return;
+  const imageRect=image.getBoundingClientRect(),streamRect=stream.getBoundingClientRect();
+  const scale=Math.min(imageRect.width/image.naturalWidth,imageRect.height/image.naturalHeight);
+  const width=image.naturalWidth*scale,height=image.naturalHeight*scale;
+  const position=getComputedStyle(image).objectPosition.split(/\s+/);
+  const toRatio=value=>value==="left"||value==="top"?0:value==="right"||value==="bottom"?1:value==="center"?0.5:Math.max(0,Math.min(1,parseFloat(value)/100||0));
+  const offsetX=(imageRect.width-width)*toRatio(position[0]);
+  const offsetY=(imageRect.height-height)*toRatio(position[1]||"50%");
+  overlay.style.left=(imageRect.left-streamRect.left+offsetX)+"px";
+  overlay.style.top=(imageRect.top-streamRect.top+offsetY)+"px";
+  overlay.style.width=width+"px";overlay.style.height=height+"px";
+  overlay.style.right="auto";overlay.style.bottom="auto";
+}
+$("mqttImage").onload=fitMqttGrid;
+window.addEventListener("resize",fitMqttGrid);
+
+function stateClass(state){
+  return state==="RUNNING"?"ok":state==="STARTING"||state==="STOPPING"?"warn":"bad";
+}
+function setState(name,data){
+  const el=$(name+"State");
+  const state=data.service_state||"STOPPED";
+  el.textContent=state;
+  el.className="state "+stateClass(state);
+  const header=$(name+"HeaderState");
+  header.textContent=name.toUpperCase()+" · "+state;
+  header.className=stateClass(state);
+}
+async function refreshStatus(){
+  try{
+    const r=await fetch("/api/status",{cache:"no-store"});
+    const s=await r.json(),u=s.udp||{},m=s.mqtt||{};
+    setState("udp",u);setState("mqtt",m);
+    $("udpFps").textContent=(u.decode_fps||0).toFixed(0)+" fps";
+    $("udpAge").textContent=age(u.last_frame_age_ms);
+    $("udpDrop").textContent=fmt((u.gap_drop||0)+(u.queue_drop_count||0));
+    $("mqttFps").textContent=(m.decode_fps||0).toFixed(0)+" fps";
+    $("mqttAge").textContent=age(m.last_frame_age_ms);
+    $("mqttDrop").textContent=fmt((m.gap_drop||0)+(m.ingress_drop_count||0));
+    const mqttGridEnabled=!!(s.app&&s.app.mqtt_grid_enabled);
+    $("mqttGridButton").textContent="网格："+(mqttGridEnabled?"开":"关");
+    $("mqttGridOverlay").classList.toggle("hidden",!mqttGridEnabled);
+    udpPreviewEnabled=!(s.app&&s.app.udp_preview_enabled===false);
+    mqttPreviewEnabled=!(s.app&&s.app.mqtt_preview_enabled===false);
+    $("udpPreview").textContent="UDP 画面："+(udpPreviewEnabled?"开":"关");
+    $("mqttPreview").textContent="MQTT 画面："+(mqttPreviewEnabled?"开":"关");
+    const deployed=m.deployment_status;
+    const deploy=$("deployHeaderState");
+    deploy.textContent=deployed===true?"部署 · 已部署":deployed===false?"部署 · 未部署":"部署 · 等待状态";
+    deploy.className=deployed===true?"ok":deployed===false?"bad":"warn";
+    // 只在明确收到“未部署”时遮罩 MQTT 图传；状态未知或已部署均保持原画面。
+    $("mqttUndeployedCross").classList.toggle("show",deployed===false);
+    const damage=s.damage||{};
+    const damageSubscribed=damage.subscribed===true;
+    $("damageState").textContent="累计伤害 · "+(damage.available===true?String(damage.value):"--");
+    $("damageState").className=damageSubscribed?"ok":"bad";
+    applyLayout();
+  }catch(e){}
+}
+function refreshFrame(name){
+  if((name==="udp"&&!udpPreviewEnabled)||(name==="mqtt"&&!mqttPreviewEnabled))return;
+  $(name+"Image").src="/api/frame/"+name+".jpg?t="+Date.now();
+}
+async function control(command,button){
+  document.querySelectorAll("button[data-control]").forEach(b=>b.disabled=true);
+  try{
+    const response=await fetch("/api/control/"+command,{method:"POST",cache:"no-store"});
+    const result=await response.json().catch(()=>({}));
+    if(!response.ok||!result.ok)throw new Error(result.error||"操作失败");
+    showToast(command.replace("/"," · ")+" 完成");
+  }catch(e){showToast(e.message||"操作失败",true);}
+  finally{document.querySelectorAll("button[data-control]").forEach(b=>b.disabled=false);refreshStatus();}
+}
+function showToast(message,bad=false){const el=$("toast");el.textContent=message;el.className="toast"+(bad?" bad":"");setTimeout(()=>{if(el.textContent===message)el.textContent=""},3000)}
+document.querySelectorAll("button[data-control]").forEach(button=>{
+  button.onclick=()=>control(button.dataset.control,button);
+});
+$("fullscreen").onclick=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await document.documentElement.requestFullscreen()}catch(e){showToast("无法切换全屏",true)}};
+$("mqttGridButton").onclick=async()=>{try{const r=await fetch("/api/mqtt/grid/toggle",{method:"POST",cache:"no-store"});const v=await r.json();if(!r.ok||!v.ok)throw new Error(v.error||"网格切换失败");showToast("MQTT 网格："+(v.mqtt_grid_enabled?"开":"关"));refreshStatus()}catch(e){showToast(e.message||"网格切换失败",true)}};
+$("udpPreview").onclick=async()=>{try{const r=await fetch("/api/udp/preview/toggle",{method:"POST",cache:"no-store"});const v=await r.json();if(!r.ok||!v.ok)throw new Error(v.error||"UDP 画面切换失败");udpPreviewEnabled=v.udp_preview_enabled;applyLayout();if(udpPreviewEnabled)refreshFrame("udp");showToast("UDP 画面："+(udpPreviewEnabled?"开":"关"));refreshStatus()}catch(e){showToast(e.message||"UDP 画面切换失败",true)}};
+$("mqttPreview").onclick=async()=>{try{const r=await fetch("/api/mqtt/preview/toggle",{method:"POST",cache:"no-store"});const v=await r.json();if(!r.ok||!v.ok)throw new Error(v.error||"MQTT 画面切换失败");mqttPreviewEnabled=v.mqtt_preview_enabled;applyLayout();if(mqttPreviewEnabled)refreshFrame("mqtt");showToast("MQTT 画面："+(mqttPreviewEnabled?"开":"关"));refreshStatus()}catch(e){showToast(e.message||"MQTT 画面切换失败",true)}};
+async function publishCrop(direction){try{const r=await fetch("/api/pub/"+direction,{method:"POST",cache:"no-store"});const v=await r.json();if(!r.ok||!v.ok)throw new Error(v.error||"调整指令发送失败");showToast(direction==="left"?"已向左调整":"已向右调整")}catch(e){showToast(e.message||"调整指令发送失败",true)}}
+$("cropMinus").onclick=()=>publishCrop("left");
+$("cropPlus").onclick=()=>publishCrop("right");
+setInterval(refreshStatus,STATUS_POLL_MS);
+setInterval(()=>refreshFrame("mqtt"),MQTT_FRAME_POLL_MS);
+setInterval(()=>refreshFrame("udp"),UDP_FRAME_POLL_MS);
+refreshStatus();refreshFrame("mqtt");refreshFrame("udp");
+</script>
+</body>
+</html>

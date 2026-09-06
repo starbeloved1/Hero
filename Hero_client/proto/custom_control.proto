@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package heroaim.control;
+
+// 发布到 MQTT topic `CustomControl` 的面板调整命令。
+//
+// value = 1：面板“+”按钮
+// value = 0：面板“−”按钮
+//
+// optional 保留数值 0 的字段存在性，避免 proto3 默认值规则把“−”编码成
+// 空消息。两个命令的二进制分别为 08 01 和 08 00。
+message CustomControl {
+  optional uint32 value = 1;
+}
