@@ -1,0 +1,56 @@
+hero_antibase_node:
+  ros__parameters:
+    # camera_router 在 mode4 自动将基地相机转发到 selected
+    image_topic: /hero/camera/selected/image_raw # sub
+    gimbal_state_topic: /hero/gimbal/state # sub
+    packet_topic: /hero/aim/antibase/packets # pub
+    tx_status_topic: /hero/aim/antibase/tx_status # sub
+    debug_topic: /hero/aim/antibase/debug # pub
+    packet_queue_depth: 64
+
+    # 仅用于 Foxglove 查看送入编码器的图像
+    visualization_enabled: false
+    visualization_topic: /hero/aim/antibase/visualization
+    visualization_rate_hz: 10.0
+
+    # antibase 编码节拍和传输约束
+    output_fps: 30
+    max_tx_delay_sec: 0.5
+    min_packet_gap_ms: 22.0
+    adaptive_bitrate_enabled: true
+    adaptive_bitrate_min_kbps: 90
+    adaptive_bitrate_max_kbps: 160
+    adaptive_bitrate_step_up_kbps: 3
+    adaptive_bitrate_step_down_kbps: 10
+    adaptive_bitrate_control_interval_sec: 1.0
+
+    # 基地画面预处理参数
+    crop_size: 960
+    crop_offset_x: -120
+    output_size: 320
+    static_simplify: true
+    motion_threshold: 12
+    motion_erode_px: 1
+    motion_dilate_px: 2
+    motion_trail_frames: 4
+    trail_brightness_gain: 1.0
+    trail_disable_motion_ratio: 0.35
+    trail_resume_motion_ratio: 0.25
+    motion_ratio_ema_alpha: 0.20
+    bg_update_alpha: 0.01
+    bg_blur_sigma: 1.2
+    center_clear_size: 160
+    force_monochrome: false
+
+    # h264 编码参数
+    target_bitrate_kbps: 130
+    h264_speed_preset: 9
+    h264_tune: 4
+    h264_key_int_max: 35
+    h264_bframes: 0
+    h264_rc_lookahead: 0
+    h264_sync_lookahead: 0
+    h264_sliced_threads: true
+    h264_ref: 1
+    h264_vbv_buf_capacity: 80
+    h264_option_string: repeat-headers=1:scenecut=0:intra-refresh=0:open-gop=0:aq-mode=2:aq-strength=1.0:mbtree=1:qcomp=0.72:deblock=1,1:force-cfr=1

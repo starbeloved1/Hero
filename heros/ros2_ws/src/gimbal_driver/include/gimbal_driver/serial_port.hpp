@@ -13,11 +13,9 @@
 
 #include "gimbal_driver/serial_protocol.hpp"
 
-namespace gimbal_driver
-{
+namespace gimbal_driver {
 
-class SerialPort
-{
+class SerialPort {
 public:
   using ReadCallback = std::function<void(const LegacyReadFrame &)>;
   using ErrorCallback = std::function<void(const std::string &)>;
@@ -25,18 +23,21 @@ public:
   SerialPort();
   ~SerialPort();
 
-  bool start(const std::string & port_name, int baud_rate, bool verify_crc);
+  bool start(const std::string &port_name, int baud_rate, bool verify_crc);
   void stop();
-  bool write(const LegacyWriteCommand & command);
+  bool write(const LegacyWriteCommand &command);
+  // 供同一串口上的旧反基地协议复用；调用者负责其上层帧边界与时序。
+  bool writeRaw(const uint8_t *data, std::size_t size);
   bool isVirtual() const;
   void setReadCallback(ReadCallback callback);
   void setErrorCallback(ErrorCallback callback);
 
 private:
-  bool open(const std::string & port_name, int baud_rate, std::string & error_message);
+  bool open(const std::string &port_name, int baud_rate,
+            std::string &error_message);
   void startRead();
-  void consume(const uint8_t * data, std::size_t size);
-  void reportError(const std::string & message);
+  void consume(const uint8_t *data, std::size_t size);
+  void reportError(const std::string &message);
 
   boost::asio::io_context io_context_;
   boost::asio::serial_port serial_port_;
@@ -53,4 +54,4 @@ private:
   ErrorCallback error_callback_;
 };
 
-}  // gimbal_driver
+} // namespace gimbal_driver

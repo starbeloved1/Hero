@@ -5,34 +5,30 @@
 #include <cstddef>
 #include <stdexcept>
 
-namespace command_mux
-{
+namespace command_mux {
 
-namespace
-{
+namespace {
 
-rclcpp::QoS highRateQos()
-{
+rclcpp::QoS highRateQos() {
   return rclcpp::QoS(rclcpp::KeepLast(1)).best_effort().durability_volatile();
 }
 
-std::chrono::nanoseconds periodFromRateHz(double rate_hz)
-{
+std::chrono::nanoseconds periodFromRateHz(double rate_hz) {
   return std::chrono::duration_cast<std::chrono::nanoseconds>(
-    std::chrono::duration<double>(1.0 / rate_hz));
+      std::chrono::duration<double>(1.0 / rate_hz));
 }
 
-}  // namespace
+} // namespace
 
-CommandMuxNode::CommandMuxNode()
-: Node("command_mux_node")
-{
+CommandMuxNode::CommandMuxNode() : Node("command_mux_node") {
   declare_parameter<std::string>("gimbal_state_topic", "/hero/gimbal/state");
   declare_parameter<std::string>("control_topic", "/hero/gimbal/control");
-  declare_parameter<std::string>("normal_control_topic", "/hero/aim/normalaim/controller");
-  declare_parameter<std::string>("anti_top_control_topic", "/hero/aim/antitop/controller");
-  declare_parameter<std::string>("auto_control_topic", "/hero/aim/autoaim/controller");
-  declare_parameter<std::string>("anti_base_control_topic", "/hero/anti_base/control_candidate");
+  declare_parameter<std::string>("normal_control_topic",
+                                 "/hero/aim/normalaim/controller");
+  declare_parameter<std::string>("anti_top_control_topic",
+                                 "/hero/aim/antitop/controller");
+  declare_parameter<std::string>("auto_control_topic",
+                                 "/hero/aim/autoaim/controller");
   declare_parameter<double>("output_rate_hz", 200.0);
   declare_parameter<double>("max_command_age_sec", 0.1);
 
@@ -47,55 +43,55 @@ CommandMuxNode::CommandMuxNode()
 
   const auto qos = highRateQos();
   control_pub_ = create_publisher<hero_msgs::msg::ControlCommand>(
-    get_parameter("control_topic").as_string(), qos);
+      get_parameter("control_topic").as_string(), qos);
   gimbal_state_sub_ = create_subscription<hero_msgs::msg::GimbalState>(
-    get_parameter("gimbal_state_topic").as_string(), qos,
-    [this](const hero_msgs::msg::GimbalState::ConstSharedPtr message) {
-      receiveGimbalState(message);
-    });
-
-  const std::array<std::pair<CommandSource, const char *>, kCandidateCount> candidates{{
-      {CommandSource::kNormal, "normal_control_topic"},
-      {CommandSource::kAntiTop, "anti_top_control_topic"},
-      {CommandSource::kAuto, "auto_control_topic"},
-      {CommandSource::kAntiBase, "anti_base_control_topic"},
-    }};
-  for (const auto & [source, parameter_name] : candidates) {
-    candidate_subs_[sourceIndex(source)] = create_subscription<hero_msgs::msg::ControlCommand>(
-      get_parameter(parameter_name).as_string(), qos,
-      [this, source](const hero_msgs::msg::ControlCommand::ConstSharedPtr message) {
-        receiveCandidate(source, message);
+      get_parameter("gimbal_state_topic").as_string(), qos,
+      [this](const hero_msgs::msg::GimbalState::ConstSharedPtr message) {
+        receiveGimbalState(message);
       });
+
+  const std::array<std::pair<CommandSource, const char *>, kCandidateCount>
+      candidates{{
+          {CommandSource::kNormal, "normal_control_topic"},
+          {CommandSource::kAntiTop, "anti_top_control_topic"},
+          {CommandSource::kAuto, "auto_control_topic"},
+      }};
+  for (const auto &[source, parameter_name] : candidates) {
+    candidate_subs_[sourceIndex(source)] =
+        create_subscription<hero_msgs::msg::ControlCommand>(
+            get_parameter(parameter_name).as_string(), qos,
+            [this, source](
+                const hero_msgs::msg::ControlCommand::ConstSharedPtr message) {
+              receiveCandidate(source, message);
+            });
   }
 
-  output_timer_ = create_wall_timer(
-    periodFromRateHz(output_rate_hz), [this]() { publishSelectedCommand(); });
+  output_timer_ = create_wall_timer(periodFromRateHz(output_rate_hz),
+                                    [this]() { publishSelectedCommand(); });
   RCLCPP_INFO(
-    get_logger(), "控制仲裁节点已启动：输出 %s，候选命令最大年龄 %.3f s",
-    get_parameter("control_topic").as_string().c_str(), max_command_age_sec_);
+      get_logger(), "控制仲裁节点已启动：输出 %s，候选命令最大年龄 %.3f s",
+      get_parameter("control_topic").as_string().c_str(), max_command_age_sec_);
 }
 
-std::size_t CommandMuxNode::sourceIndex(CommandSource source)
-{
+std::size_t CommandMuxNode::sourceIndex(CommandSource source) {
   switch (source) {
-    case CommandSource::kNormal:
-      return 0U;
-    case CommandSource::kAntiTop:
-      return 1U;
-    case CommandSource::kAuto:
-      return 2U;
-    case CommandSource::kAntiBase:
-      return 3U;
-    case CommandSource::kNone:
-      break;
+  case CommandSource::kNormal:
+    return 0U;
+  case CommandSource::kAntiTop:
+    return 1U;
+  case CommandSource::kAuto:
+    return 2U;
+  case CommandSource::kNone:
+    break;
   }
   throw std::invalid_argument("无效的候选控制来源");
 }
 
-void CommandMuxNode::receiveGimbalState(const hero_msgs::msg::GimbalState::ConstSharedPtr & message)
-{
+void CommandMuxNode::receiveGimbalState(
+    const hero_msgs::msg::GimbalState::ConstSharedPtr &message) {
   std::lock_guard<std::mutex> lock(mutex_);
-  if (latest_gimbal_state_.has_value() && latest_gimbal_state_->mode != message->mode) {
+  if (latest_gimbal_state_.has_value() &&
+      latest_gimbal_state_->mode != message->mode) {
     // 模式切换后不复用切换前缓存的任何候选，必须等待新模式重新产生控制。
     candidates_.fill(std::nullopt);
   }
@@ -103,20 +99,23 @@ void CommandMuxNode::receiveGimbalState(const hero_msgs::msg::GimbalState::Const
 }
 
 void CommandMuxNode::receiveCandidate(
-  CommandSource source, const hero_msgs::msg::ControlCommand::ConstSharedPtr & message)
-{
+    CommandSource source,
+    const hero_msgs::msg::ControlCommand::ConstSharedPtr &message) {
   if (!std::isfinite(message->yaw) || !std::isfinite(message->pitch)) {
-    RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000, "忽略包含非有限角度的候选控制命令");
+    RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000,
+                         "忽略包含非有限角度的候选控制命令");
     return;
   }
   if (rclcpp::Time(message->header.stamp).nanoseconds() <= 0) {
-    RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000, "忽略没有有效时间戳的候选控制命令");
+    RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000,
+                         "忽略没有有效时间戳的候选控制命令");
     return;
   }
 
   std::lock_guard<std::mutex> lock(mutex_);
   if (!latest_gimbal_state_.has_value()) {
-    RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000, "尚未收到云台状态，忽略候选控制命令");
+    RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000,
+                         "尚未收到云台状态，忽略候选控制命令");
     return;
   }
   if (!sourceMatchesMode(source, latest_gimbal_state_->mode)) {
@@ -125,8 +124,7 @@ void CommandMuxNode::receiveCandidate(
   candidates_[sourceIndex(source)] = CachedCandidate{*message};
 }
 
-void CommandMuxNode::publishSelectedCommand()
-{
+void CommandMuxNode::publishSelectedCommand() {
   const auto publish_time = now();
   std::optional<hero_msgs::msg::GimbalState> state;
   std::optional<CachedCandidate> candidate;
@@ -143,10 +141,15 @@ void CommandMuxNode::publishSelectedCommand()
     }
   }
 
+  if (state->mode == hero_msgs::msg::GimbalState::MODE_ANTI_BASE) {
+    // mode4 的串口只承载反基地码流，连保持角度控制帧也不发布。
+    return;
+  }
   auto output = makeSafeCommand(*state, publish_time);
   if (candidate.has_value() && sourceMatchesMode(source, state->mode)) {
     const auto candidate_time = rclcpp::Time(candidate->command.header.stamp);
-    if (isFresh(candidate_time.seconds(), publish_time.seconds(), max_command_age_sec_)) {
+    if (isFresh(candidate_time.seconds(), publish_time.seconds(),
+                max_command_age_sec_)) {
       output = candidate->command;
       // 控制帧表示本次仲裁后立即送往下位机的命令，时间戳写为本次输出时刻。
       output.header.stamp = publish_time;
@@ -155,9 +158,9 @@ void CommandMuxNode::publishSelectedCommand()
   control_pub_->publish(output);
 }
 
-hero_msgs::msg::ControlCommand CommandMuxNode::makeSafeCommand(
-  const hero_msgs::msg::GimbalState & state, const rclcpp::Time & stamp) const
-{
+hero_msgs::msg::ControlCommand
+CommandMuxNode::makeSafeCommand(const hero_msgs::msg::GimbalState &state,
+                                const rclcpp::Time &stamp) const {
   hero_msgs::msg::ControlCommand command;
   command.header.stamp = stamp;
   command.header.frame_id = state.header.frame_id;
@@ -168,4 +171,4 @@ hero_msgs::msg::ControlCommand CommandMuxNode::makeSafeCommand(
   return command;
 }
 
-}  // command_mux
+} // namespace command_mux

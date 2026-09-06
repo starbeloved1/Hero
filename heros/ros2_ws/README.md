@@ -37,7 +37,8 @@
 - `aim_predictor`：mode 3 自瞄预测，维护每个目标车的四装甲板 EKF 状态，并向 `/hero/aim/autoaim/target_states` 发布预测结果；不直接控制云台。
 - `aim_auto`：mode 3 自瞄控制，锁定目标车、预测命中时刻的装甲板、求弹道并向 `/hero/aim/autoaim/controller` 发布候选；`/hero/aim/autoaim/debug` 用于查看选择与开火门。
 - `aim_antitop`：mode 2 反前哨。连续选择前哨板、拟合 XY 旋转中心、标定三层 Z 高度；利用同刻 TF 与 `CameraInfo` 的内参、畸变参数，将旋转中心重投影回原始图像，完成方向识别、射击区域、周期统计和倒计时开火。候选发布到 `/hero/aim/antitop/controller`，过程量发布到 `/hero/aim/antitop/debug`，三维过程量发布到 `/hero/aim/antitop/markers`；默认禁用且不开火。
-- `command_mux`：按云台模式仲裁四个独立候选入口，并独占发布 `/hero/gimbal/control`。无候选、候选过期或模式切换时保持当前角度且禁止开火。
+- `hero_antibase`：mode 4 反基地。仅消费 selected 基地画面，完成旧工程的预处理、H.264 编码、292B 数据分包与自适应码率；不使用检测、PnP、TF、弹道或 yaw/pitch 控制。
+- `command_mux`：按云台模式仲裁 mode1、mode2、mode3 三路候选，并独占发布 `/hero/gimbal/control`。mode4 没有控制候选，云台驱动只发送反基地码流。
 
 `aim_core/config/ballistics.yaml` 保存所有瞄准策略共用的弹速、阻力、重力、弹丸尺寸/质量、枪口偏移和迭代次数。每个策略的 launch 都应先加载此文件，再加载自身 YAML；策略自身只保存目标选择、控制、话题和安全开关等差异参数。
 
@@ -92,7 +93,7 @@ ros2 param set /gimbal_driver_node virtual_robot_color 1
 ./run.sh
 ```
 
-脚本会直接启动目前已迁移的 `gimbal_driver`、`hero_tf`、`camera_driver`、`camera_router`、`armor_detector`、`armor_solver`、`aim_predictor`、`aim_auto`、`aim_normal`、`aim_antitop`、`command_mux`，以及 `foxglove_bridge`；不额外使用总启动功能包。
+脚本会直接启动目前已迁移的 `gimbal_driver`、`hero_tf`、`camera_driver`、`camera_router`、`hero_antibase`、`armor_detector`、`armor_solver`、`aim_predictor`、`aim_auto`、`aim_normal`、`aim_antitop`、`command_mux`，以及 `foxglove_bridge`；不额外使用总启动功能包。
 该命令不覆盖任何参数，全部行为以各功能包 `config/` 目录中的 YAML 为准：车上使用串口和大恒相机；需要本地回放时再由你把对应 YAML 改为视频源。
 运行后在 Foxglove Desktop 中连接 `ws://localhost:8765`，即可查看话题和 TF。若此前已手动启动 Bridge，应先停止它，避免端口 `8765` 冲突。
 
@@ -112,3 +113,9 @@ mode 3 的 `aim_predictor` 与 `aim_auto` 默认会在模式 3 下计算、发�
 该图是调试专用副本：原始 `/hero/camera/selected/image_raw` 与结构化检测结果 `/hero/detector/armors` 不会被修改。发布上限由 `visualization_rate_hz` 配置，且只有 Image 面板订阅该话题时才复制、绘制和发布图像；实战或性能测试时可将 `visualization_enabled` 设为 `false`。
 
 在 Foxglove 新建 **3D** 面板并选择 `/hero/solver/markers`，可查看 PnP 后位于 `world` 坐标系的三维装甲板。结构化位姿数据位于 `/hero/solver/armor_poses`，其中 `reprojection_error` 越小表示该帧二维角点与 PnP 结果越一致。录像分辨率与内参不一致时，Marker 只能用于检查链路，不可视为真实空间位置。
+
+## Mode4 反基地
+
+云台状态切到 `mode: 4` 后，`camera_router` 将基地相机切到 selected，`hero_antibase` 开始生成 H.264 码流逻辑包，`gimbal_driver` 自动按旧协议写入真实串口：每个逻辑包为 8B 小端序号加 292B H.264 数据，拆成 5 个 `'#' + 分片序号 + 60B + CRC16` 的 64B 帧，分片间隔 2 ms，完整包起始间隔为 22 ms。
+
+`/hero/aim/antibase/packets.header.stamp` 始终是源图像时刻 `T0`；`/hero/aim/antibase/tx_status.last_send_stamp` 是实际串口开始发送时刻 `Tsend`。Foxglove 可查看 `/hero/aim/antibase/debug` 的编码字节数、码率、运动比例、缓存和丢包统计。将 `hero_antibase.yaml` 的 `visualization_enabled` 设为 `true` 后，可在 `/hero/aim/antibase/visualization` 查看实际送入编码器的 320×320 预处理图像。UDP/MQTT 本地调试镜像尚未迁移。

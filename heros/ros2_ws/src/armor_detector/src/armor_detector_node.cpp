@@ -1,7 +1,7 @@
 #include "armor_detector/armor_detector_node.hpp"
 
-#include <cstdint>
 #include <chrono>
+#include <cstdint>
 #include <filesystem>
 #include <stdexcept>
 #include <string>
@@ -9,28 +9,24 @@
 
 #include <ament_index_cpp/get_package_share_directory.hpp>
 #if __has_include(<cv_bridge/cv_bridge.hpp>)
-  #include <cv_bridge/cv_bridge.hpp>
+#include <cv_bridge/cv_bridge.hpp>
 #else
-  #include <cv_bridge/cv_bridge.h>
+#include <cv_bridge/cv_bridge.h>
 #endif
 #include <geometry_msgs/msg/point32.hpp>
 
 #include "armor_detector/armor_detector.hpp"
 #include "armor_detector/armor_visualizer.hpp"
 
-namespace armor_detector
-{
+namespace armor_detector {
 
-namespace
-{
+namespace {
 
-rclcpp::QoS highRateQos()
-{
+rclcpp::QoS highRateQos() {
   return rclcpp::QoS(rclcpp::KeepLast(1)).best_effort().durability_volatile();
 }
 
-std::string resolveModelPath(const std::string & configured_path)
-{
+std::string resolveModelPath(const std::string &configured_path) {
   if (configured_path.empty()) {
     throw std::invalid_argument("model_path 不能为空");
   }
@@ -39,14 +35,16 @@ std::string resolveModelPath(const std::string & configured_path)
     return path.string();
   }
   const std::filesystem::path package_share(
-    ament_index_cpp::get_package_share_directory("armor_detector"));
+      ament_index_cpp::get_package_share_directory("armor_detector"));
   const auto package_model = package_share / path;
   if (std::filesystem::exists(package_model)) {
     return package_model.string();
   }
 
-  // 模型统一存放在 heros/model。开发环境与部署目录均从功能包 share 目录向上查找。
-  for (auto directory = package_share; !directory.empty(); directory = directory.parent_path()) {
+  // 模型统一存放在 heros/model。开发环境与部署目录均从功能包 share
+  // 目录向上查找。
+  for (auto directory = package_share; !directory.empty();
+       directory = directory.parent_path()) {
     const auto project_model = directory / "model" / path.filename();
     if (std::filesystem::exists(project_model)) {
       return project_model.string();
@@ -55,35 +53,39 @@ std::string resolveModelPath(const std::string & configured_path)
   return package_model.string();
 }
 
-}  // namespace
+} // namespace
 
-DetectorNode::DetectorNode()
-: Node("armor_detector_node")
-{
-  declare_parameter<std::string>("image_topic", "/hero/camera/selected/image_raw");
+DetectorNode::DetectorNode() : Node("armor_detector_node") {
+  declare_parameter<std::string>("image_topic",
+                                 "/hero/camera/selected/image_raw");
   declare_parameter<std::string>("gimbal_state_topic", "/hero/gimbal/state");
   declare_parameter<std::string>("armor_topic", "/hero/detector/armors");
   declare_parameter<bool>("visualization_enabled", true);
-  declare_parameter<std::string>("visualization_topic", "/hero/detector/visualization");
+  declare_parameter<std::string>("visualization_topic",
+                                 "/hero/detector/visualization");
   declare_parameter<double>("visualization_rate_hz", 10.0);
   declare_parameter<std::string>("model_path", "model/0526.onnx");
   declare_parameter<std::string>("inference_device", "CPU");
   declare_parameter<double>("confidence_threshold", 0.75);
   declare_parameter<double>("nms_threshold", 0.45);
-  // -1：根据 robot_color 自动选择敌方颜色；-2：不按颜色过滤；0/1：固定目标颜色。
+  // -1：根据 robot_color
+  // 自动选择敌方颜色；-2：不按颜色过滤；0/1：固定目标颜色。
   declare_parameter<int>("target_color", -1);
 
   target_color_ = get_parameter("target_color").as_int();
-  if (target_color_ != -2 && target_color_ != -1 && target_color_ != 0 && target_color_ != 1) {
+  if (target_color_ != -2 && target_color_ != -1 && target_color_ != 0 &&
+      target_color_ != 1) {
     throw std::invalid_argument("target_color 只能是 -2、-1、0 或 1");
   }
 
   ArmorDetectorConfig detector_config;
-  detector_config.model_path = resolveModelPath(get_parameter("model_path").as_string());
+  detector_config.model_path =
+      resolveModelPath(get_parameter("model_path").as_string());
   detector_config.device_name = get_parameter("inference_device").as_string();
   detector_config.confidence_threshold =
-    static_cast<float>(get_parameter("confidence_threshold").as_double());
-  detector_config.nms_threshold = static_cast<float>(get_parameter("nms_threshold").as_double());
+      static_cast<float>(get_parameter("confidence_threshold").as_double());
+  detector_config.nms_threshold =
+      static_cast<float>(get_parameter("nms_threshold").as_double());
   armor_detector_ = std::make_unique<ArmorDetector>(detector_config);
 
   const auto image_topic = get_parameter("image_topic").as_string();
@@ -91,44 +93,49 @@ DetectorNode::DetectorNode()
   if (image_topic.empty() || armor_topic.empty()) {
     throw std::invalid_argument("图像与检测结果话题不能为空");
   }
-  armor_pub_ = create_publisher<hero_msgs::msg::ArmorArray>(armor_topic, highRateQos());
+  armor_pub_ =
+      create_publisher<hero_msgs::msg::ArmorArray>(armor_topic, highRateQos());
   if (get_parameter("visualization_enabled").as_bool()) {
-    const auto visualization_topic = get_parameter("visualization_topic").as_string();
-    const auto visualization_rate_hz = get_parameter("visualization_rate_hz").as_double();
+    const auto visualization_topic =
+        get_parameter("visualization_topic").as_string();
+    const auto visualization_rate_hz =
+        get_parameter("visualization_rate_hz").as_double();
     if (visualization_topic.empty()) {
       throw std::invalid_argument("visualization_topic 不能为空");
     }
     if (visualization_rate_hz <= 0.0) {
       throw std::invalid_argument("visualization_rate_hz 必须大于 0");
     }
-    visualization_period_ = std::chrono::duration_cast<std::chrono::nanoseconds>(
-      std::chrono::duration<double>(1.0 / visualization_rate_hz));
+    visualization_period_ =
+        std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::duration<double>(1.0 / visualization_rate_hz));
     visualization_pub_ = create_publisher<sensor_msgs::msg::Image>(
-      visualization_topic, highRateQos());
+        visualization_topic, highRateQos());
   }
   image_sub_ = create_subscription<sensor_msgs::msg::Image>(
-    image_topic, highRateQos(),
-    [this](const sensor_msgs::msg::Image::ConstSharedPtr image) { receiveImage(image); });
-  if (target_color_ == -1) {
-    gimbal_state_sub_ = create_subscription<hero_msgs::msg::GimbalState>(
+      image_topic, highRateQos(),
+      [this](const sensor_msgs::msg::Image::ConstSharedPtr image) {
+        receiveImage(image);
+      });
+  // 即使颜色不是自动模式，也需感知 mode4：旧工程在反基地时不运行装甲板检测。
+  gimbal_state_sub_ = create_subscription<hero_msgs::msg::GimbalState>(
       get_parameter("gimbal_state_topic").as_string(), highRateQos(),
-      [this](const hero_msgs::msg::GimbalState::ConstSharedPtr state) { receiveGimbalState(state); });
-  }
+      [this](const hero_msgs::msg::GimbalState::ConstSharedPtr state) {
+        receiveGimbalState(state);
+      });
 
   running_.store(true);
   worker_ = std::thread([this]() { processLoop(); });
-  RCLCPP_INFO(
-    get_logger(), "装甲板检测节点已启动：输入 %s，输出 %s，颜色模式 %d", image_topic.c_str(),
-    armor_topic.c_str(), target_color_);
+  RCLCPP_INFO(get_logger(),
+              "装甲板检测节点已启动：输入 %s，输出 %s，颜色模式 %d",
+              image_topic.c_str(), armor_topic.c_str(), target_color_);
   if (visualization_pub_) {
-    RCLCPP_INFO(
-      get_logger(), "检测可视化已启用：%s，仅在有订阅者时按限频发布",
-      get_parameter("visualization_topic").as_string().c_str());
+    RCLCPP_INFO(get_logger(), "检测可视化已启用：%s，仅在有订阅者时按限频发布",
+                get_parameter("visualization_topic").as_string().c_str());
   }
 }
 
-DetectorNode::~DetectorNode()
-{
+DetectorNode::~DetectorNode() {
   running_.store(false);
   image_cv_.notify_all();
   if (worker_.joinable()) {
@@ -136,8 +143,8 @@ DetectorNode::~DetectorNode()
   }
 }
 
-void DetectorNode::receiveImage(const sensor_msgs::msg::Image::ConstSharedPtr & image)
-{
+void DetectorNode::receiveImage(
+    const sensor_msgs::msg::Image::ConstSharedPtr &image) {
   {
     std::lock_guard<std::mutex> lock(image_mutex_);
     latest_image_ = image;
@@ -145,24 +152,26 @@ void DetectorNode::receiveImage(const sensor_msgs::msg::Image::ConstSharedPtr & 
   image_cv_.notify_one();
 }
 
-void DetectorNode::receiveGimbalState(const hero_msgs::msg::GimbalState::ConstSharedPtr & state)
-{
+void DetectorNode::receiveGimbalState(
+    const hero_msgs::msg::GimbalState::ConstSharedPtr &state) {
+  gimbal_mode_.store(state->mode);
   if (state->robot_color == 0U || state->robot_color == 1U) {
     robot_color_.store(static_cast<int>(state->robot_color));
   } else {
-    RCLCPP_WARN_THROTTLE(
-      get_logger(), *get_clock(), 2000, "忽略未知 robot_color：%u",
-      static_cast<unsigned int>(state->robot_color));
+    RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000,
+                         "忽略未知 robot_color：%u",
+                         static_cast<unsigned int>(state->robot_color));
   }
 }
 
-void DetectorNode::processLoop()
-{
+void DetectorNode::processLoop() {
   while (rclcpp::ok() && running_.load()) {
     sensor_msgs::msg::Image::ConstSharedPtr image;
     {
       std::unique_lock<std::mutex> lock(image_mutex_);
-      image_cv_.wait(lock, [this]() { return !running_.load() || latest_image_ != nullptr; });
+      image_cv_.wait(lock, [this]() {
+        return !running_.load() || latest_image_ != nullptr;
+      });
       if (!running_.load()) {
         return;
       }
@@ -171,36 +180,41 @@ void DetectorNode::processLoop()
     }
 
     const auto target_color = resolveTargetColor();
+    if (gimbal_mode_.load() == hero_msgs::msg::GimbalState::MODE_ANTI_BASE) {
+      // mode4 的 selected 是基地相机，交给 hero_antibase
+      // 编码；不发布旧检测结果。
+      continue;
+    }
     if (target_color == -1) {
-      RCLCPP_WARN_THROTTLE(
-        get_logger(), *get_clock(), 2000,
-        "尚未收到有效 robot_color，发布空检测结果");
+      RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000,
+                           "尚未收到有效 robot_color，发布空检测结果");
       publishDetections(image, {});
       continue;
     }
 
     try {
       const auto cv_image = cv_bridge::toCvShare(image, "bgr8");
-      publishDetections(image, armor_detector_->detect(cv_image->image, target_color));
-    } catch (const std::exception & error) {
-      RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 2000, "装甲板检测失败：%s", error.what());
+      publishDetections(image,
+                        armor_detector_->detect(cv_image->image, target_color));
+    } catch (const std::exception &error) {
+      RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 2000,
+                            "装甲板检测失败：%s", error.what());
       publishDetections(image, {});
     }
   }
 }
 
 void DetectorNode::publishDetections(
-  const sensor_msgs::msg::Image::ConstSharedPtr & image,
-  const std::vector<ArmorDetection> & detections)
-{
+    const sensor_msgs::msg::Image::ConstSharedPtr &image,
+    const std::vector<ArmorDetection> &detections) {
   hero_msgs::msg::ArmorArray output;
   output.header = image->header;
   output.armors.reserve(detections.size());
-  for (const auto & detection : detections) {
+  for (const auto &detection : detections) {
     hero_msgs::msg::Armor armor;
     armor.header = image->header;
     for (std::size_t index = 0; index < detection.corners.size(); ++index) {
-      auto & corner = armor.corners[index];
+      auto &corner = armor.corners[index];
       corner.x = detection.corners[index].x;
       corner.y = detection.corners[index].y;
       corner.z = 0.0F;
@@ -215,41 +229,40 @@ void DetectorNode::publishDetections(
 }
 
 void DetectorNode::publishVisualization(
-  const sensor_msgs::msg::Image::ConstSharedPtr & image,
-  const std::vector<ArmorDetection> & detections)
-{
+    const sensor_msgs::msg::Image::ConstSharedPtr &image,
+    const std::vector<ArmorDetection> &detections) {
   if (!shouldPublishVisualization()) {
     return;
   }
 
   try {
     const auto cv_image = cv_bridge::toCvShare(image, "bgr8");
-    auto visualization = cv_bridge::CvImage(
-      image->header, "bgr8", drawDetections(cv_image->image, detections)).toImageMsg();
+    auto visualization =
+        cv_bridge::CvImage(image->header, "bgr8",
+                           drawDetections(cv_image->image, detections))
+            .toImageMsg();
     visualization_pub_->publish(*visualization);
-  } catch (const std::exception & error) {
-    RCLCPP_ERROR_THROTTLE(
-      get_logger(), *get_clock(), 2000, "检测可视化发布失败：%s", error.what());
+  } catch (const std::exception &error) {
+    RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 2000,
+                          "检测可视化发布失败：%s", error.what());
   }
 }
 
-bool DetectorNode::shouldPublishVisualization()
-{
-  if (!visualization_pub_ || visualization_pub_->get_subscription_count() == 0U) {
+bool DetectorNode::shouldPublishVisualization() {
+  if (!visualization_pub_ ||
+      visualization_pub_->get_subscription_count() == 0U) {
     return false;
   }
   const auto now = std::chrono::steady_clock::now();
   if (last_visualization_time_.time_since_epoch().count() != 0 &&
-    now - last_visualization_time_ < visualization_period_)
-  {
+      now - last_visualization_time_ < visualization_period_) {
     return false;
   }
   last_visualization_time_ = now;
   return true;
 }
 
-int DetectorNode::resolveTargetColor() const
-{
+int DetectorNode::resolveTargetColor() const {
   if (target_color_ != -1) {
     return target_color_;
   }
@@ -263,4 +276,4 @@ int DetectorNode::resolveTargetColor() const
   return -1;
 }
 
-}  // armor_detector
+} // namespace armor_detector

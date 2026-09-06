@@ -8,7 +8,6 @@ command_mux_node:
     normal_control_topic: /hero/aim/normalaim/controller
     anti_top_control_topic: /hero/aim/antitop/controller
     auto_control_topic: /hero/aim/autoaim/controller
-    anti_base_control_topic: /hero/anti_base/control_candidate
 
     output_rate_hz: 200.0
     # 候选命令超过该年龄后不再转发，改为保持当前角度并禁止开火。

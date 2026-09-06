@@ -50,6 +50,9 @@ pids+=("$!")
 ros2 launch camera_router camera_router.launch.py &
 pids+=("$!")
 
+ros2 launch hero_antibase hero_antibase.launch.py &
+pids+=("$!")
+
 ros2 launch armor_detector armor_detector.launch.py &
 pids+=("$!")
 

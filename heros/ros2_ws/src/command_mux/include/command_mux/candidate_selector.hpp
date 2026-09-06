@@ -2,16 +2,13 @@
 
 #include <cstdint>
 
-namespace command_mux
-{
+namespace command_mux {
 
-enum class CommandSource : std::uint8_t
-{
+enum class CommandSource : std::uint8_t {
   kNone,
   kNormal,
   kAntiTop,
   kAuto,
-  kAntiBase,
 };
 
 // 根据云台模式确定唯一允许通过的策略候选命令。
@@ -23,4 +20,4 @@ bool isFresh(double command_time_sec, double now_sec, double max_age_sec);
 // 仅允许当前模式对应的独立入口通过。
 bool sourceMatchesMode(CommandSource source, std::uint8_t mode);
 
-}  // command_mux
+} // namespace command_mux

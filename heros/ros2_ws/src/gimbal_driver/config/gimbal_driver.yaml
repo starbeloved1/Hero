@@ -16,3 +16,10 @@ gimbal_driver_node:
     gimbal_frame_id: gimbal_link
     state_publish_rate_hz: 200.0
     command_send_rate_hz: 200.0
+
+    # mode4 反基地码流由本节点独占写入同一串口；完整包起始间隔必须严格大于 20 ms。
+    antibase_packet_topic: /hero/aim/antibase/packets
+    antibase_tx_status_topic: /hero/aim/antibase/tx_status
+    antibase_min_packet_gap_ms: 22.0
+    antibase_chunk_gap_ms: 2.0
+    antibase_queue_depth: 64

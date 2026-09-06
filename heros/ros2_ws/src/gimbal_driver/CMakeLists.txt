@@ -19,6 +19,12 @@ target_compile_features(virtual_gimbal_state PUBLIC cxx_std_17)
 target_include_directories(virtual_gimbal_state PUBLIC include)
 target_link_libraries(virtual_gimbal_state serial_protocol)
 
+add_library(antibase_protocol src/antibase_protocol.cpp)
+target_compile_features(antibase_protocol PUBLIC cxx_std_17)
+target_include_directories(antibase_protocol PUBLIC include)
+ament_target_dependencies(antibase_protocol hero_msgs)
+target_link_libraries(antibase_protocol serial_protocol)
+
 add_executable(gimbal_driver_node
   src/serial_port.cpp
   src/gimbal_driver_node.cpp
@@ -26,10 +32,10 @@ add_executable(gimbal_driver_node
 )
 target_compile_features(gimbal_driver_node PUBLIC cxx_std_17)
 target_include_directories(gimbal_driver_node PRIVATE include)
-target_link_libraries(gimbal_driver_node serial_protocol virtual_gimbal_state Boost::system)
+target_link_libraries(gimbal_driver_node serial_protocol virtual_gimbal_state antibase_protocol Boost::system)
 ament_target_dependencies(gimbal_driver_node hero_msgs rclcpp rcl_interfaces)
 
-install(TARGETS serial_protocol virtual_gimbal_state gimbal_driver_node
+install(TARGETS serial_protocol virtual_gimbal_state antibase_protocol gimbal_driver_node
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME}
@@ -46,6 +52,10 @@ if(BUILD_TESTING)
   ament_add_gtest(test_virtual_gimbal_state test/test_virtual_gimbal_state.cpp)
   target_link_libraries(test_virtual_gimbal_state virtual_gimbal_state)
   target_include_directories(test_virtual_gimbal_state PRIVATE include)
+
+  ament_add_gtest(test_antibase_protocol test/test_antibase_protocol.cpp)
+  target_link_libraries(test_antibase_protocol antibase_protocol serial_protocol)
+  target_include_directories(test_antibase_protocol PRIVATE include)
 endif()
 
 ament_package()

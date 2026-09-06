@@ -5,44 +5,44 @@
 #include <stdexcept>
 #include <utility>
 
-namespace gimbal_driver
-{
+#include "gimbal_driver/antibase_protocol.hpp"
 
-namespace
-{
+namespace gimbal_driver {
+
+namespace {
 
 constexpr double kDegreesToRadians = 3.14159265358979323846 / 180.0;
 constexpr double kRadiansToDegrees = 180.0 / 3.14159265358979323846;
 
-rclcpp::QoS highRateQos()
-{
+rclcpp::QoS highRateQos() {
   return rclcpp::QoS(rclcpp::KeepLast(1)).best_effort().durability_volatile();
 }
 
-uint8_t toMode(uint8_t raw_mode_flag)
-{
+rclcpp::QoS antiBaseQos(std::size_t depth) {
+  return rclcpp::QoS(rclcpp::KeepLast(depth)).reliable().durability_volatile();
+}
+
+uint8_t toMode(uint8_t raw_mode_flag) {
   switch (raw_mode_flag) {
-    case hero_msgs::msg::GimbalState::MODE_NORMAL:
-    case hero_msgs::msg::GimbalState::MODE_ANTI_TOP:
-    case hero_msgs::msg::GimbalState::MODE_AUTO_AIM:
-    case hero_msgs::msg::GimbalState::MODE_ANTI_BASE:
-      return raw_mode_flag;
-    default:
-      return hero_msgs::msg::GimbalState::MODE_NORMAL;
+  case hero_msgs::msg::GimbalState::MODE_NORMAL:
+  case hero_msgs::msg::GimbalState::MODE_ANTI_TOP:
+  case hero_msgs::msg::GimbalState::MODE_AUTO_AIM:
+  case hero_msgs::msg::GimbalState::MODE_ANTI_BASE:
+    return raw_mode_flag;
+  default:
+    return hero_msgs::msg::GimbalState::MODE_NORMAL;
   }
 }
 
-std::chrono::nanoseconds periodFromRateHz(double rate_hz)
-{
+std::chrono::nanoseconds periodFromRateHz(double rate_hz) {
   return std::chrono::duration_cast<std::chrono::nanoseconds>(
-    std::chrono::duration<double>(1.0 / rate_hz));
+      std::chrono::duration<double>(1.0 / rate_hz));
 }
 
-}  // namespace
+} // namespace
 
 GimbalDriverNode::GimbalDriverNode()
-: Node("gimbal_driver_node"), serial_port_(std::make_unique<SerialPort>())
-{
+    : Node("gimbal_driver_node"), serial_port_(std::make_unique<SerialPort>()) {
   //节点参数
   declare_parameter<std::string>("port_name", "/dev/ttyACM0");
   declare_parameter<int>("baud_rate", 115200);
@@ -56,66 +56,114 @@ GimbalDriverNode::GimbalDriverNode()
   declare_parameter<std::string>("gimbal_frame_id", "gimbal_link");
   declare_parameter<double>("state_publish_rate_hz", 200.0);
   declare_parameter<double>("command_send_rate_hz", 200.0);
+  declare_parameter<std::string>("antibase_packet_topic",
+                                 "/hero/aim/antibase/packets");
+  declare_parameter<std::string>("antibase_tx_status_topic",
+                                 "/hero/aim/antibase/tx_status");
+  declare_parameter<double>("antibase_min_packet_gap_ms", 22.0);
+  declare_parameter<double>("antibase_chunk_gap_ms", 2.0);
+  declare_parameter<int>("antibase_queue_depth", 64);
 
   const auto state_rate = get_parameter("state_publish_rate_hz").as_double();
   const auto command_rate = get_parameter("command_send_rate_hz").as_double();
   if (state_rate <= 0.0 || command_rate <= 0.0) {
-    throw std::invalid_argument("state_publish_rate_hz and command_send_rate_hz must be positive");
+    throw std::invalid_argument(
+        "state_publish_rate_hz and command_send_rate_hz must be positive");
   }
   const auto command_flag = get_parameter("command_flag").as_int();
   if (command_flag < 0 || command_flag > 255) {
     throw std::invalid_argument("command_flag must fit in uint8");
   }
+  const auto antibase_min_packet_gap_ms =
+      get_parameter("antibase_min_packet_gap_ms").as_double();
+  const auto antibase_chunk_gap_ms =
+      get_parameter("antibase_chunk_gap_ms").as_double();
+  const auto antibase_queue_depth =
+      get_parameter("antibase_queue_depth").as_int();
+  if (antibase_min_packet_gap_ms <= 20.0 || antibase_chunk_gap_ms < 0.0 ||
+      antibase_queue_depth <= 0) {
+    throw std::invalid_argument(
+        "反基地包间隔必须大于 20 ms，分片间隔不能为负，队列深度必须为正");
+  }
+  antibase_min_packet_gap_ =
+      std::chrono::duration_cast<std::chrono::nanoseconds>(
+          std::chrono::duration<double, std::milli>(
+              antibase_min_packet_gap_ms));
+  antibase_chunk_gap_ = std::chrono::duration_cast<std::chrono::nanoseconds>(
+      std::chrono::duration<double, std::milli>(antibase_chunk_gap_ms));
+  antibase_queue_depth_ = static_cast<std::size_t>(antibase_queue_depth);
   enable_fire_ = get_parameter("enable_fire").as_bool();
   command_flag_ = static_cast<uint8_t>(command_flag);
   gimbal_frame_id_ = get_parameter("gimbal_frame_id").as_string();
   if (!virtual_state_.setMode(get_parameter("virtual_mode").as_int())) {
     throw std::invalid_argument("virtual_mode 必须是 1 到 4");
   }
-  if (!virtual_state_.setRobotColor(get_parameter("virtual_robot_color").as_int())) {
+  if (!virtual_state_.setRobotColor(
+          get_parameter("virtual_robot_color").as_int())) {
     throw std::invalid_argument("virtual_robot_color 必须是 0 或 1");
   }
 
-  //pub&sub
+  // pub&sub
   state_pub_ = create_publisher<hero_msgs::msg::GimbalState>(
-    get_parameter("state_topic").as_string(), highRateQos());
+      get_parameter("state_topic").as_string(), highRateQos());
   control_sub_ = create_subscription<hero_msgs::msg::ControlCommand>(
-    get_parameter("control_topic").as_string(), highRateQos(),
-    [this](const hero_msgs::msg::ControlCommand::SharedPtr message) {receiveCommand(*message);});
+      get_parameter("control_topic").as_string(), highRateQos(),
+      [this](const hero_msgs::msg::ControlCommand::SharedPtr message) {
+        receiveCommand(*message);
+      });
+  antibase_packet_sub_ = create_subscription<hero_msgs::msg::AntiBasePacket>(
+      get_parameter("antibase_packet_topic").as_string(),
+      antiBaseQos(antibase_queue_depth_),
+      [this](const hero_msgs::msg::AntiBasePacket::SharedPtr message) {
+        receiveAntiBasePacket(*message);
+      });
+  antibase_tx_status_pub_ = create_publisher<hero_msgs::msg::AntiBaseTxStatus>(
+      get_parameter("antibase_tx_status_topic").as_string(), antiBaseQos(1U));
 
   //注册串口回调
-  serial_port_->setReadCallback([this](const LegacyReadFrame & frame) {receiveState(frame);});
-  serial_port_->setErrorCallback([this](const std::string & message) {
-    RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 2000, "%s", message.c_str());
+  serial_port_->setReadCallback(
+      [this](const LegacyReadFrame &frame) { receiveState(frame); });
+  serial_port_->setErrorCallback([this](const std::string &message) {
+    RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 2000, "%s",
+                          message.c_str());
   });
 
-  if (!serial_port_->start(
-      get_parameter("port_name").as_string(), get_parameter("baud_rate").as_int(),
-      get_parameter("enable_crc_check").as_bool()))
-  {
+  if (!serial_port_->start(get_parameter("port_name").as_string(),
+                           get_parameter("baud_rate").as_int(),
+                           get_parameter("enable_crc_check").as_bool())) {
     throw std::runtime_error("串口驱动启动失败");
   }
   virtual_serial_ = serial_port_->isVirtual();
   parameter_callback_handle_ = add_on_set_parameters_callback(
-    [this](const std::vector<rclcpp::Parameter> & parameters) {
-      return handleParameters(parameters);
-    });
+      [this](const std::vector<rclcpp::Parameter> &parameters) {
+        return handleParameters(parameters);
+      });
 
   //创建state与command定时发布器
-  state_timer_ = create_wall_timer(periodFromRateHz(state_rate), [this]() {publishState();});
-  command_timer_ = create_wall_timer(periodFromRateHz(command_rate), [this]() {sendCommand();});
-  RCLCPP_INFO(
-    get_logger(), "云台串口驱动已启动：%s，开火输出%s",
-    virtual_serial_ ? "虚拟串口" : "真实串口", enable_fire_ ? "已启用" : "未启用");
+  state_timer_ = create_wall_timer(periodFromRateHz(state_rate),
+                                   [this]() { publishState(); });
+  command_timer_ = create_wall_timer(periodFromRateHz(command_rate),
+                                     [this]() { sendCommand(); });
+  antibase_status_timer_ = create_wall_timer(
+      std::chrono::milliseconds(100), [this]() { publishAntiBaseTxStatus(); });
+  antibase_running_.store(true);
+  antibase_send_thread_ = std::thread([this]() { sendAntiBaseLoop(); });
+  RCLCPP_INFO(get_logger(), "云台串口驱动已启动：%s，开火输出%s",
+              virtual_serial_ ? "虚拟串口" : "真实串口",
+              enable_fire_ ? "已启用" : "未启用");
 }
 
-GimbalDriverNode::~GimbalDriverNode()
-{
+GimbalDriverNode::~GimbalDriverNode() {
+  antibase_running_.store(false);
+  antibase_cv_.notify_all();
+  if (antibase_send_thread_.joinable()) {
+    antibase_send_thread_.join();
+  }
   serial_port_->stop();
 }
 
-void GimbalDriverNode::receiveState(const LegacyReadFrame & frame)
-{
+void GimbalDriverNode::receiveState(const LegacyReadFrame &frame) {
+  updateMode(toMode(frame.mode_flag));
   std::lock_guard<std::mutex> lock(state_mutex_);
   int8_t exposure_step = 0;
   if (frame.up && !previous_up_ && !frame.down) {
@@ -128,14 +176,14 @@ void GimbalDriverNode::receiveState(const LegacyReadFrame & frame)
   latest_state_ = CachedState{frame, now(), exposure_step};
 }
 
-void GimbalDriverNode::publishState()
-{
+void GimbalDriverNode::publishState() {
   if (virtual_serial_) {
     LegacyReadFrame frame;
     {
       std::lock_guard<std::mutex> lock(virtual_state_mutex_);
       frame = virtual_state_.frame();
     }
+    updateMode(toMode(frame.mode_flag));
     publishState(frame, now(), 0);
     return;
   }
@@ -155,9 +203,9 @@ void GimbalDriverNode::publishState()
   publishState(state->frame, state->stamp, state->exposure_step);
 }
 
-void GimbalDriverNode::publishState(
-  const LegacyReadFrame & frame, const rclcpp::Time & stamp, int8_t exposure_step)
-{
+void GimbalDriverNode::publishState(const LegacyReadFrame &frame,
+                                    const rclcpp::Time &stamp,
+                                    int8_t exposure_step) {
   hero_msgs::msg::GimbalState message;
   message.header.stamp = stamp;
   message.header.frame_id = gimbal_frame_id_;
@@ -174,13 +222,13 @@ void GimbalDriverNode::publishState(
 }
 
 rcl_interfaces::msg::SetParametersResult GimbalDriverNode::handleParameters(
-  const std::vector<rclcpp::Parameter> & parameters)
-{
+    const std::vector<rclcpp::Parameter> &parameters) {
   rcl_interfaces::msg::SetParametersResult result;
   result.successful = true;
   if (!virtual_serial_) {
-    for (const auto & parameter : parameters) {
-      if (parameter.get_name() == "virtual_mode" || parameter.get_name() == "virtual_robot_color") {
+    for (const auto &parameter : parameters) {
+      if (parameter.get_name() == "virtual_mode" ||
+          parameter.get_name() == "virtual_robot_color") {
         result.successful = false;
         result.reason = "只有 port_name 为 virtual 时才能修改虚拟状态";
         return result;
@@ -191,16 +239,15 @@ rcl_interfaces::msg::SetParametersResult GimbalDriverNode::handleParameters(
 
   std::lock_guard<std::mutex> lock(virtual_state_mutex_);
   auto next_state = virtual_state_;
-  for (const auto & parameter : parameters) {
-    if (parameter.get_name() == "virtual_mode" && !next_state.setMode(parameter.as_int())) {
+  for (const auto &parameter : parameters) {
+    if (parameter.get_name() == "virtual_mode" &&
+        !next_state.setMode(parameter.as_int())) {
       result.successful = false;
       result.reason = "virtual_mode 必须是 1 到 4";
       return result;
     }
-    if (
-      parameter.get_name() == "virtual_robot_color" &&
-      !next_state.setRobotColor(parameter.as_int()))
-    {
+    if (parameter.get_name() == "virtual_robot_color" &&
+        !next_state.setRobotColor(parameter.as_int())) {
       result.successful = false;
       result.reason = "virtual_robot_color 必须是 0 或 1";
       return result;
@@ -210,18 +257,21 @@ rcl_interfaces::msg::SetParametersResult GimbalDriverNode::handleParameters(
   return result;
 }
 
-void GimbalDriverNode::receiveCommand(const hero_msgs::msg::ControlCommand & message)
-{
+void GimbalDriverNode::receiveCommand(
+    const hero_msgs::msg::ControlCommand &message) {
   if (!std::isfinite(message.yaw) || !std::isfinite(message.pitch)) {
-    RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000, "ignoring non-finite gimbal command");
+    RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000,
+                         "ignoring non-finite gimbal command");
     return;
   }
   std::lock_guard<std::mutex> lock(command_mutex_);
   latest_command_ = CachedCommand{message};
 }
 
-void GimbalDriverNode::sendCommand()
-{
+void GimbalDriverNode::sendCommand() {
+  if (current_mode_.load() == hero_msgs::msg::GimbalState::MODE_ANTI_BASE) {
+    return;
+  }
   std::optional<CachedCommand> command;
   {
     std::lock_guard<std::mutex> lock(command_mutex_);
@@ -231,12 +281,128 @@ void GimbalDriverNode::sendCommand()
     return;
   }
   LegacyWriteCommand wire_command;
-  wire_command.yaw_deg = static_cast<float>(command->message.yaw * kRadiansToDegrees);
-  wire_command.pitch_deg = static_cast<float>(command->message.pitch * kRadiansToDegrees);
+  wire_command.yaw_deg =
+      static_cast<float>(command->message.yaw * kRadiansToDegrees);
+  wire_command.pitch_deg =
+      static_cast<float>(command->message.pitch * kRadiansToDegrees);
   wire_command.shoot_status = enable_fire_ ? command->message.shoot_status : 0U;
   wire_command.target_id = command->message.target_id;
   wire_command.command_flag = command_flag_;
   serial_port_->write(wire_command);
 }
 
-}  // gimbal_driver
+void GimbalDriverNode::receiveAntiBasePacket(
+    const hero_msgs::msg::AntiBasePacket &message) {
+  if (current_mode_.load() != hero_msgs::msg::GimbalState::MODE_ANTI_BASE) {
+    antibase_dropped_packets_.fetch_add(1U);
+    return;
+  }
+  {
+    std::lock_guard<std::mutex> lock(antibase_mutex_);
+    if (antibase_packets_.size() >= antibase_queue_depth_) {
+      antibase_packets_.pop_front();
+      antibase_dropped_packets_.fetch_add(1U);
+    }
+    antibase_packets_.push_back(
+        PendingAntiBasePacket{message, std::chrono::steady_clock::now()});
+  }
+  antibase_cv_.notify_one();
+}
+
+void GimbalDriverNode::sendAntiBaseLoop() {
+  std::optional<std::chrono::steady_clock::time_point> last_packet_start;
+  while (antibase_running_.load()) {
+    hero_msgs::msg::AntiBasePacket packet;
+    {
+      std::unique_lock<std::mutex> lock(antibase_mutex_);
+      antibase_cv_.wait(lock, [this]() {
+        return !antibase_running_.load() || !antibase_packets_.empty();
+      });
+      if (!antibase_running_.load()) {
+        return;
+      }
+      if (current_mode_.load() != hero_msgs::msg::GimbalState::MODE_ANTI_BASE) {
+        antibase_packets_.clear();
+        continue;
+      }
+      if (last_packet_start.has_value()) {
+        const auto due = *last_packet_start + antibase_min_packet_gap_;
+        if (std::chrono::steady_clock::now() < due) {
+          antibase_cv_.wait_until(lock, due, [this]() {
+            return !antibase_running_.load() ||
+                   current_mode_.load() !=
+                       hero_msgs::msg::GimbalState::MODE_ANTI_BASE;
+          });
+          continue;
+        }
+      }
+      packet = std::move(antibase_packets_.front().message);
+      antibase_packets_.pop_front();
+    }
+
+    if (current_mode_.load() != hero_msgs::msg::GimbalState::MODE_ANTI_BASE) {
+      antibase_dropped_packets_.fetch_add(1U);
+      continue;
+    }
+    last_packet_start = std::chrono::steady_clock::now();
+    {
+      std::lock_guard<std::mutex> lock(antibase_mutex_);
+      antibase_last_send_stamp_ = now();
+    }
+    const auto chunks = encodeAntiBasePacket(packet);
+    bool sent = true;
+    for (std::size_t index = 0; index < chunks.size(); ++index) {
+      sent =
+          serial_port_->writeRaw(chunks[index].data(), chunks[index].size()) &&
+          sent;
+      if (index + 1U < chunks.size()) {
+        std::this_thread::sleep_for(antibase_chunk_gap_);
+      }
+    }
+    if (sent) {
+      antibase_sent_packets_.fetch_add(1U);
+    } else {
+      antibase_dropped_packets_.fetch_add(1U);
+    }
+  }
+}
+
+void GimbalDriverNode::publishAntiBaseTxStatus() {
+  hero_msgs::msg::AntiBaseTxStatus status;
+  status.header.stamp = now();
+  status.header.frame_id = gimbal_frame_id_;
+  status.sent_packets = antibase_sent_packets_.load();
+  status.dropped_packets = antibase_dropped_packets_.load();
+  {
+    std::lock_guard<std::mutex> lock(antibase_mutex_);
+    status.last_send_stamp = antibase_last_send_stamp_;
+    status.pending_packets = static_cast<uint32_t>(antibase_packets_.size());
+    if (!antibase_packets_.empty()) {
+      status.oldest_pending_ms = static_cast<float>(
+          std::max(0.0, std::chrono::duration<double, std::milli>(
+                            std::chrono::steady_clock::now() -
+                            antibase_packets_.front().enqueued_at)
+                            .count()));
+    }
+  }
+  antibase_tx_status_pub_->publish(status);
+}
+
+void GimbalDriverNode::updateMode(uint8_t mode) {
+  const auto previous_mode = current_mode_.exchange(mode);
+  if (previous_mode == mode) {
+    return;
+  }
+  {
+    std::lock_guard<std::mutex> lock(antibase_mutex_);
+    antibase_dropped_packets_.fetch_add(antibase_packets_.size());
+    antibase_packets_.clear();
+  }
+  {
+    std::lock_guard<std::mutex> lock(command_mutex_);
+    latest_command_.reset();
+  }
+  antibase_cv_.notify_all();
+}
+
+} // namespace gimbal_driver
