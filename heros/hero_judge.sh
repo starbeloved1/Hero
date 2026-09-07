@@ -2,7 +2,8 @@
 
 set -euo pipefail
 
-tool_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+project_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+tool_dir="${project_dir}/tools/hero_judge"
 
 if ! command -v mosquitto >/dev/null 2>&1; then
   echo "未找到 mosquitto；请安装：sudo apt install mosquitto mosquitto-clients python3-paho-mqtt" >&2
