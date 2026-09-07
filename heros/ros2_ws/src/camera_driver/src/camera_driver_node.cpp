@@ -1,7 +1,11 @@
 #include "camera_driver/camera_driver_node.hpp"
 
 #include <chrono>
+#include <cmath>
+#include <cstdint>
 #include <filesystem>
+#include <limits>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -12,8 +16,11 @@
 #include <sensor_msgs/msg/camera_info.hpp>
 #include <sensor_msgs/msg/image.hpp>
 
+#include <hero_msgs/msg/camera_timing.hpp>
+
 #include "camera_driver/camera_source.hpp"
 #include "camera_driver/daheng_camera.hpp"
+#include "camera_driver/timestamp_mapper.hpp"
 
 namespace camera_driver
 {
@@ -54,13 +61,20 @@ struct CameraDriverNode::Stream
   std::string name;
   std::string frame_id;
   CameraSource source{CameraSource::kDaheng};
+  TimestampMode timestamp_mode{TimestampMode::kHost};
   DahengCamera camera;
   cv::VideoCapture video;
   bool video_loop{true};
   std::chrono::nanoseconds video_period{0};
+  double timestamp_offset_sec{0.0};
+  std::uint64_t device_timestamp_frequency_hz{0U};
+  DeviceTimestampMapper timestamp_mapper;
+  std::optional<std::int64_t> ros_to_steady_offset_ns;
+  std::optional<rclcpp::Time> last_image_stamp;
   sensor_msgs::msg::CameraInfo camera_info;
   rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr image_pub;
   rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr camera_info_pub;
+  rclcpp::Publisher<hero_msgs::msg::CameraTiming>::SharedPtr timing_pub;
   std::thread thread;
 };
 
@@ -68,6 +82,8 @@ struct CameraDriverNode::Frame
 {
   std::uint32_t width{0};
   std::uint32_t height{0};
+  std::uint64_t device_timestamp{0U};
+  std::chrono::steady_clock::time_point host_receive_steady{};
   std::vector<std::uint8_t> bgr_data;
 };
 
@@ -82,6 +98,10 @@ CameraDriverNode::CameraDriverNode()
     declare_parameter<std::string>(std::string(name) + ".video_path", "");
     declare_parameter<bool>(std::string(name) + ".video_loop", true);
     declare_parameter<double>(std::string(name) + ".video_rate_hz", 0.0);
+    declare_parameter<std::string>(std::string(name) + ".timestamp_mode", "host");
+    declare_parameter<double>(std::string(name) + ".timestamp_offset_sec", 0.0);
+    declare_parameter<std::string>(
+      std::string(name) + ".timing_topic", std::string("/hero/camera/") + name + "/timing");
     declare_parameter<std::string>(std::string(name) + ".frame_id", std::string(name) + "_camera_optical_frame");
     declare_parameter<std::string>(
       std::string(name) + ".image_topic", std::string("/hero/camera/") + name + "/image_raw");
@@ -110,6 +130,13 @@ CameraDriverNode::CameraDriverNode()
     stream->name = name;
     stream->frame_id = get_parameter(std::string(name) + ".frame_id").as_string();
     stream->source = parseCameraSource(get_parameter(std::string(name) + ".source").as_string());
+    stream->timestamp_mode = parseTimestampMode(
+      get_parameter(std::string(name) + ".timestamp_mode").as_string());
+    stream->timestamp_offset_sec =
+      get_parameter(std::string(name) + ".timestamp_offset_sec").as_double();
+    if (!std::isfinite(stream->timestamp_offset_sec)) {
+      throw std::runtime_error(name + std::string(" timestamp_offset_sec 必须是有限数"));
+    }
     DahengCameraConfig config;
     config.serial_number = get_parameter(std::string(name) + ".serial_number").as_string();
     config.width = get_parameter(std::string(name) + ".width").as_int();
@@ -121,7 +148,15 @@ CameraDriverNode::CameraDriverNode()
       if (!stream->camera.open(config, error)) {
         throw std::runtime_error(name + std::string(" 相机打开失败：") + error);
       }
+      if (stream->timestamp_mode == TimestampMode::kDevice &&
+          !stream->camera.timestampTickFrequencyHz(
+            stream->device_timestamp_frequency_hz, error)) {
+        throw std::runtime_error(name + std::string(" 无法启用设备时间戳：") + error);
+      }
     } else {
+      if (stream->timestamp_mode != TimestampMode::kHost) {
+        throw std::runtime_error(name + std::string(" 视频输入只支持 timestamp_mode: host"));
+      }
       const auto video_path = resolveVideoPath(
         get_parameter(std::string(name) + ".video_path").as_string());
       if (!stream->video.open(video_path)) {
@@ -167,6 +202,11 @@ CameraDriverNode::CameraDriverNode()
     stream->image_pub = create_publisher<sensor_msgs::msg::Image>(image_topic, highRateQos());
     stream->camera_info_pub =
       create_publisher<sensor_msgs::msg::CameraInfo>(camera_info_topic, highRateQos());
+    const auto timing_topic = get_parameter(std::string(name) + ".timing_topic").as_string();
+    if (timing_topic.empty()) {
+      throw std::runtime_error(name + std::string(" timing_topic 不能为空"));
+    }
+    stream->timing_pub = create_publisher<hero_msgs::msg::CameraTiming>(timing_topic, highRateQos());
     stream->camera_info.width = static_cast<std::uint32_t>(config.width);
     stream->camera_info.height = static_cast<std::uint32_t>(config.height);
     stream->camera_info.distortion_model = "plumb_bob";
@@ -186,6 +226,15 @@ CameraDriverNode::CameraDriverNode()
   }
   if (streams_.empty()) {
     throw std::runtime_error("至少启用一路相机");
+  }
+  bool use_sim_time = false;
+  get_parameter_or("use_sim_time", use_sim_time, false);
+  if (use_sim_time) {
+    for (const auto & stream : streams_) {
+      if (stream->timestamp_mode == TimestampMode::kDevice) {
+        throw std::runtime_error("设备时间戳模式不支持 use_sim_time");
+      }
+    }
   }
   running_.store(true);
   for (auto & stream : streams_) {
@@ -218,8 +267,16 @@ void CameraDriverNode::captureLoop(Stream & stream)
       RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000, "%s 相机取图失败：%s", stream.name.c_str(), error.c_str());
       continue;
     }
+    const auto host_publish_stamp = now();
+    rclcpp::Time host_receive_stamp{0, 0, RCL_ROS_TIME};
+    double mapping_offset_sec = 0.0;
+    const auto stamp = makeFrameStamp(
+      stream, frame, host_publish_stamp, host_receive_stamp, mapping_offset_sec);
+    if (!stamp.has_value()) {
+      continue;
+    }
     sensor_msgs::msg::Image image;
-    image.header.stamp = now();
+    image.header.stamp = *stamp;
     image.header.frame_id = stream.frame_id;
     image.height = frame.height; image.width = frame.width; image.encoding = "bgr8";
     image.step = frame.width * 3U; image.data = std::move(frame.bgr_data);
@@ -227,6 +284,19 @@ void CameraDriverNode::captureLoop(Stream & stream)
     info.header = image.header;
     stream.image_pub->publish(image);
     stream.camera_info_pub->publish(info);
+    if (stream.timing_pub->get_subscription_count() > 0U) {
+      hero_msgs::msg::CameraTiming timing;
+      timing.header = image.header;
+      timing.device_timestamp =
+        stream.source == CameraSource::kDaheng ? frame.device_timestamp : 0U;
+      timing.device_timestamp_frequency_hz = stream.device_timestamp_frequency_hz;
+      timing.host_receive_stamp = host_receive_stamp;
+      timing.host_publish_stamp = host_publish_stamp;
+      timing.timestamp_mode = timestampModeName(stream.timestamp_mode);
+      timing.device_to_host_offset_sec = mapping_offset_sec;
+      timing.reset_count = stream.timestamp_mapper.resetCount();
+      stream.timing_pub->publish(timing);
+    }
     if (stream.source == CameraSource::kVideo) {
       next_video_frame_time += stream.video_period;
       std::this_thread::sleep_until(next_video_frame_time);
@@ -246,6 +316,8 @@ bool CameraDriverNode::readFrame(Stream & stream, Frame & frame, std::string & e
   }
   frame.width = daheng_frame.width;
   frame.height = daheng_frame.height;
+  frame.device_timestamp = daheng_frame.device_timestamp;
+  frame.host_receive_steady = daheng_frame.host_receive_steady;
   frame.bgr_data = std::move(daheng_frame.bgr_data);
   return true;
 }
@@ -285,10 +357,81 @@ bool CameraDriverNode::readVideoFrame(Stream & stream, Frame & frame, std::strin
   }
   frame.width = static_cast<std::uint32_t>(bgr_image.cols);
   frame.height = static_cast<std::uint32_t>(bgr_image.rows);
+  frame.host_receive_steady = std::chrono::steady_clock::now();
   frame.bgr_data.assign(
     bgr_image.data,
     bgr_image.data + static_cast<std::size_t>(frame.width) * frame.height * 3U);
   return true;
+}
+
+std::optional<rclcpp::Time> CameraDriverNode::makeFrameStamp(
+  Stream & stream, const Frame & frame, const rclcpp::Time & host_publish_stamp,
+  rclcpp::Time & host_receive_stamp, double & mapping_offset_sec)
+{
+  mapping_offset_sec = 0.0;
+  const auto steady_now = std::chrono::steady_clock::now();
+  const auto steady_now_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+    steady_now.time_since_epoch()).count();
+  const auto ros_now_ns = host_publish_stamp.nanoseconds();
+  const auto ros_to_steady_ns = ros_now_ns - steady_now_ns;
+  const auto receive_steady_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+    frame.host_receive_steady.time_since_epoch()).count();
+  host_receive_stamp = rclcpp::Time(receive_steady_ns + ros_to_steady_ns, RCL_ROS_TIME);
+  if (stream.timestamp_mode == TimestampMode::kHost) {
+    const auto stamp = host_publish_stamp +
+      rclcpp::Duration::from_seconds(stream.timestamp_offset_sec);
+    if (stream.last_image_stamp.has_value() && stamp <= *stream.last_image_stamp) {
+      RCLCPP_WARN_THROTTLE(
+        get_logger(), *get_clock(), 2000,
+        "%s host 时间戳未递增，丢弃当前图像", stream.name.c_str());
+      return std::nullopt;
+    }
+    stream.last_image_stamp = stamp;
+    return stamp;
+  }
+
+  if (stream.ros_to_steady_offset_ns.has_value() &&
+      hasRosSteadyClockJump(
+        *stream.ros_to_steady_offset_ns, ros_to_steady_ns,
+        std::chrono::duration_cast<std::chrono::nanoseconds>(
+          std::chrono::milliseconds(100)).count())) {
+    stream.timestamp_mapper.reset();
+    stream.ros_to_steady_offset_ns.reset();
+    stream.last_image_stamp.reset();
+    RCLCPP_WARN(get_logger(), "%s 检测到 ROS 时间跳变，已重置设备时间映射并丢弃当前图像",
+                stream.name.c_str());
+    return std::nullopt;
+  }
+  stream.ros_to_steady_offset_ns = ros_to_steady_ns;
+  TimestampMapping mapping;
+  try {
+    mapping = stream.timestamp_mapper.update(
+      frame.device_timestamp, stream.device_timestamp_frequency_hz, receive_steady_ns);
+  } catch (const std::exception & error) {
+    RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 2000,
+                          "%s 设备时间戳映射失败：%s", stream.name.c_str(), error.what());
+    return std::nullopt;
+  }
+  if (mapping.update == TimestampUpdate::kReset) {
+    RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000,
+                         "%s 设备时间戳未递增或频率变化，已重置映射并丢弃当前图像",
+                         stream.name.c_str());
+    return std::nullopt;
+  }
+  mapping_offset_sec = mapping.residual_offset_sec;
+  const auto mapped_stamp = rclcpp::Time(
+    mapping.mapped_host_steady_ns + ros_to_steady_ns, RCL_ROS_TIME);
+  // 未加人工补偿时，设备映射不能晚于该帧已经到达主机的时刻。
+  const auto base_stamp = std::min(mapped_stamp, host_receive_stamp);
+  const auto stamp = base_stamp +
+    rclcpp::Duration::from_seconds(stream.timestamp_offset_sec);
+  if (stream.last_image_stamp.has_value() && stamp <= *stream.last_image_stamp) {
+    RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000,
+                         "%s 设备映射时间戳未递增，丢弃当前图像", stream.name.c_str());
+    return std::nullopt;
+  }
+  stream.last_image_stamp = stamp;
+  return stamp;
 }
 
 }  // camera_driver

@@ -117,12 +117,41 @@ bool DahengCamera::read(DahengFrame & frame, std::string & error)
   frame.width = buffer->nWidth;
   frame.height = buffer->nHeight;
   frame.device_timestamp = buffer->nTimestamp;
+  frame.host_receive_steady = std::chrono::steady_clock::now();
   frame.bgr_data.resize(static_cast<std::size_t>(frame.width) * frame.height * 3U);
   const auto convert_status = DxRaw8toRGB24Ex(
     static_cast<unsigned char *>(buffer->pImgBuf), frame.bgr_data.data(), frame.width, frame.height,
     RAW2RGB_NEIGHBOUR, static_cast<DX_PIXEL_COLOR_FILTER>(color_filter_), false, DX_ORDER_BGR);
   const auto queue_status = GXQBuf(device_, buffer);
   return check(convert_status, error) && check(queue_status, error);
+}
+
+bool DahengCamera::timestampTickFrequencyHz(std::uint64_t & frequency_hz,
+                                            std::string & error) const
+{
+  if (device_ == nullptr) {
+    error = "相机尚未打开，无法读取时间戳频率";
+    return false;
+  }
+  bool implemented = false;
+  if (!check(GXIsImplemented(device_, GX_INT_TIMESTAMP_TICK_FREQUENCY,
+                             &implemented), error) ||
+      !implemented) {
+    if (error.empty()) {
+      error = "相机不支持时间戳频率查询";
+    }
+    return false;
+  }
+  std::int64_t value = 0;
+  if (!check(GXGetInt(device_, GX_INT_TIMESTAMP_TICK_FREQUENCY, &value), error) ||
+      value <= 0) {
+    if (error.empty()) {
+      error = "相机返回无效时间戳频率";
+    }
+    return false;
+  }
+  frequency_hz = static_cast<std::uint64_t>(value);
+  return true;
 }
 
 void DahengCamera::close()

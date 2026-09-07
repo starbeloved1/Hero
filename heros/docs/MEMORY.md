@@ -5,10 +5,10 @@
 ## 项目上下文
 
 - Git 根目录：`Hero/`；新 ROS 2 工程：`Hero/heros/ros2_ws/`；目标版本：ROS 2 Humble。瞄准域源码统一位于 `ros2_ws/src/hero_aim/`，其中每个子目录仍为独立 ROS package。
-- `2026HeroAim/` 是旧 C++ 兼容性基准，只读。
-- `../ly_aim/` 是参考实现，不是运行时依赖。
-- 项目长期目标是英雄机器人 ROS 2 自瞄系统的开发、优化、测试、部署与维护；旧 C++ 迁移是当前阶段。
-- 当前协作方式：以一个完整、可验证的小切片为单位实现；构建和测试后先进行代码讲解，再继续迁移。用户偏好直接、逐段的代码阅读，并会参与命名和结构决定。
+- `2026HeroAim/` 是旧 C++ 的只读、相对稳定行为基准。Hero 尚未完成稳定性验证时，必须持续对照其协议、标定含义、公开行为和算法结果。
+- `../ly_aim/` 是优秀的 ROS 参考案例，不是运行时依赖；必须主动借鉴其处理思路、包拆分、参数、launch、测试与硬件生命周期，同时保持 Hero 的既定行为。
+- ROS 功能块的初步迁移已完成，项目当前阶段不再是大规模迁移，而是熟悉学习代码和通信流程、以录像与实车验证检测稳定性、学习读取可视化与 debug 数据调参，并在实证基础上逐步优化现有代码。
+- 当前协作方式：围绕可验证的问题推进；改动按风险完成构建、测试或实车/录像验证，并先带用户读懂相关代码。用户偏好直接、逐段的代码阅读，并会参与命名和结构决定。
 
 ## 当前功能包状态
 
@@ -59,13 +59,21 @@
 - 在 `camera_driver.yaml` 中将相机 `source` 设为 `video` 并填写录像路径即可离线回放；`data/文件名.avi` 表示项目根目录的 `heros/data/文件名.avi`。视频保持真实相机的 topic 与 `CameraInfo` 接口，可用于路由、检测和算法的离线开发；驱动自动将 `Image` 与 `CameraInfo` 的宽高设为视频实际分辨率，但 YAML 内参仍必须对应该分辨率。配合 `gimbal_driver.yaml` 中的 `port_name: virtual`，可完整提供本地云台状态。
 - `heros/run.sh` 是当前已迁移功能包的一键入口。脚本直接依次启动 `gimbal_driver`、`hero_tf`、`camera_driver`、`camera_router`、`hero_antibase`、`armor_detector`、`armor_solver`、`aim_predictor`、`aim_auto`、`aim_normal`、`aim_antitop`、`command_mux` 与 `foxglove_bridge`，不使用额外的 `bringup` 功能包，也不覆盖任何 YAML 参数。mode3 默认计算候选但不开火；普通瞄准与反前哨默认不发候选且不开火，待录像和实车验证后由 YAML 显式开启。是否读取视频、相机与串口参数均由各包 YAML 决定；Foxglove Desktop 连接 `ws://localhost:8765` 即可观察系统。
 - 已在无真实相机的开发机上验证过已迁移节点的组合启动；因当前 YAML 选择大恒相机且开发机未接相机，`camera_driver` 正确报告“未发现大恒相机”并退出。上车前应确认相机序列号和串口设备名。`gimbal_driver` 的虚拟模式已完成构建、单元测试和 ROS 话题验证：默认发布普通模式/蓝色，动态切换到反基地/红色后由 `camera_router` 正确切到基地相机。
-- 后续优化项：在完整链路和实时正确性验证后，评估将相机采集、相机路由和装甲板检测放入组件容器并使用进程内通信，以及将检测器改为 OpenVINO 双请求异步流水线。当前迁移阶段不为此重构，优先补齐完整功能链路。
-- 可视化与性能调优的优先级：当前只保留支撑功能验证所需的基础 Foxglove 话题和调试图；完整链路写完并能端到端运行后，再统一完善 Foxglove 布局、频率与延迟统计、性能测量和参数调优，避免在迁移中途为局部观测反复重构。
+- 后续优化项：在录像与实车确认完整链路和实时正确性后，评估将相机采集、相机路由和装甲板检测放入组件容器并使用进程内通信，以及将检测器改为 OpenVINO 双请求异步流水线。优化必须先有测量与对照结果，不凭推测重构。
+- 可视化与性能调优的当前优先级：使用已有 Foxglove 话题和调试图学习链路数据，建立检测稳定性、延迟和丢帧的观察方法；再根据录像和实车证据完善布局、频率、延迟统计与参数，避免仅为观测而扰动行为。
 - 最终多模式控制决定：模式唯一来源为 `/hero/gimbal/state` 的 `GimbalState.mode`，模式切换不重启节点。三个功能包固定命名为 `aim_normal`、`aim_antitop`、`aim_auto`；topic 中完整写出模式名，固定为 `/hero/aim/normalaim/controller`、`/hero/aim/antitop/controller`、`/hero/aim/autoaim/controller`。mode 1 的 `aim_normal` 迁移旧 `NormalAim`，自身完成目标选择、弹道、角度平滑并发布普通候选；mode 2 的 `aim_antitop` 迁移旧 `AntiTop`，自身完成前哨跟踪、旋转中心/Z 标定、射击状态机、弹道并发布反陀螺候选；mode 3 的 `aim_predictor` 独立维护纯三维预测状态，`aim_auto` 负责锁车、选中预测装甲板、飞行时间迭代与安全开火决策并发布自瞄候选。mode3 不迁移旧工程的整车 YOLO 硬门槛；高加速度第一版仅禁火，不使用依赖二维 Tracker 面板编号的旧观测回退。反基地因相机、目标和逻辑独立而保留独立入口。所有策略都只发布 `ControlCommand` 候选，`command_mux` 按 mode 放行正确入口并独占发布 `/hero/gimbal/control`，避免多发布者交错控制云台；候选命令必须包含生成时刻，仲裁器只接受未超过 `max_command_age_sec` 的候选命令。公共弹道、角度归一化、控制消息辅助函数放入无 ROS 依赖的 `aim_core` C++ 库，不以一个公共 ROS 节点强行共享。
-- 下一步使用下载的本地视频核对 `/hero/detector/armors` 与 `/hero/solver/armor_poses` 的时间戳、相机坐标系、编号、颜色、角点、PnP 深度和重投影误差；录像分辨率与内参不一致时，不得相信三维数值。结合结果验证 `aim_normal` 的 `/hero/aim/normalaim/debug`，再迁移追踪预测模块。在上车前仍须验证两台真实相机的设备发现、SN 匹配、图像话题、时间戳和路由切换。
+- 当前验证与学习顺序：先用下载的本地视频理解相机、路由、检测、PnP、各 mode 及其通信 topic，核对 `/hero/detector/armors`、`/hero/solver/armor_poses` 与各策略 debug/markers 的时间戳、坐标系、编号、颜色、角点、深度和重投影误差；再以录像和 `2026HeroAim` 对照检测稳定性；最后上车验证两台真实相机的设备发现、SN 匹配、图像话题、时间戳、路由切换、云台控制和各模式行为。录像分辨率与内参不一致时，不得相信三维数值。
 - mode4 串口协议决定：`AntiBasePacket` 保留源图像 `T0`，含 8B 小端 `sequence_id` 和 292B H.264 数据；`gimbal_driver` 是唯一串口拥有者，写为 5 个 `'#' + chunk_index + 60B + CRC16` 的 64B 帧，分片间隔 2 ms、逻辑包起始间隔 21 ms。其 `/hero/antibase/tx_status` 的 `last_send_stamp` 是实际写出时刻 `Tsend`。mode4 自动发送码流，普通 14B 云台控制帧在该模式被抑制；切换模式会清空未发送包。虚拟串口中发送按逻辑成功计数，可用于离线链路验证。
 - 反基地 MQTT 裁判闭环已实现：`gimbal_driver` 在最终 21 ms 节拍且五个串口分片均成功后，可选地镜像同一 300B 逻辑包至 UDP `127.0.0.1:9999`（默认关闭，实车保持关闭）；`tools/hero_judge/hero_judge.yaml` 是 UDP/MQTT 监听地址、端口、topic、QoS、间隔规则和统计周期的唯一默认配置，`hero_judge.py` 可用命令行临时覆盖它。裁判以单调时钟比较相邻**收到**包，间隔 `<= 20 ms` 的当前包直接丢弃且更新“上一个收到包”时刻，放行包以比赛格式转发至本机 Mosquitto。`tools/hero_judge/run_hero_judge.sh` 启动仅监听 `127.0.0.1:3333` 的 broker 和裁判；修改 YAML 的 MQTT host/port 时须同步更新该目录的 `mosquitto_hero_judge.conf`。MQTT 必须为 `CustomByteBlock` topic、QoS 1、303B `0x0A 0xAC 0x02 + 300B`，其中 300B 为 8B 小端序号加 292B H.264。`Hero_client/src/sub_win.py` 是实际比赛客户端的协议解析、序号/缺包处理、H.264 组帧解码基准，不能另写不兼容接收器。`2026HeroAim/src/Mqtt_pub/antibase_receiver_mqtt.py` 是只读协议参考。开发机已安装 `mosquitto`、`mosquitto-clients`、`python3-paho-mqtt`；独立端到端验证已确认 303B 封装正确，25 ms 级包放行、5.1 ms 包丢弃。
-- 后续迁移顺序：本地 MQTT 裁判模拟闭环（最终发送节拍 → 303B MQTT → `Hero_client` 解码）→ 全系统 launch、rosbag 回归、部署验证。临时 `AimTarget` 与“公共 aim_controller”已移除，不得将新算法接回这类过渡接口。
+- 当前工作顺序：熟悉代码与通信流程 → 录像验证检测和各 debug/markers 的稳定性 → 实车验证相机、云台和各模式行为 → 基于证据调参及优化；全过程持续对照 `2026HeroAim` 的稳定行为，并借鉴 `ly_aim` 的处理思路。临时 `AimTarget` 与“公共 aim_controller”已移除，不得将新算法接回这类过渡接口。
+
+## 时间戳链路
+
+- `camera_driver` 每路相机均有 `timestamp_mode`、`timestamp_offset_sec` 与 `timing_topic`。默认 `host`，保持取图和 BGR 转换后以 ROS `now()` 为图像时间；视频输入只允许此模式。
+- 真实大恒相机可显式使用 `timestamp_mode: device`。驱动读取 SDK 时间戳频率，先在 `GXDQBuf` 返回后、BGR 转换前记录主机单调时间，再以首帧建立设备计数到主机单调时间的相对映射，并用 0.02 系数低通修正。映射减少主机处理抖动，但其偏移仍包含相机到主机的传输延迟，不等同于精确曝光时刻。
+- `/hero/camera/{aim8mm,base}/timing` 在有订阅者时发布 `CameraTiming`，可观察原始设备计数及频率、取图时间、发布前时间、最终图像时间、映射残差和重置次数。设备计数回退、频率变化、时间戳不递增或 ROS 时钟相对单调时钟跳变超过 100 ms 时，设备模式重置映射并丢弃跨边界帧；`use_sim_time` 不支持设备模式。
+- `gimbal_driver` 的真实串口状态时间在有效帧回调入口记录，配置 `state_timestamp_offset_sec` 可进行人工补偿，默认 0。虚拟串口不使用该补偿。`hero_tf` 原样使用 `GimbalState.header.stamp`，不得再叠加补偿。
+- 未接大恒硬件时只验证默认视频／虚拟串口路径。上车后先在 host/device 两种相机模式下记录固定目标、云台左右转动和停稳数据，再根据世界坐标稳定性、TF 查询失败率和帧间抖动决定是否启用 device 与设置人工补偿。
 
 ## 已验证命令
 
@@ -83,3 +91,10 @@ colcon test-result --verbose
 ```
 
 `gimbal_driver` 与 `camera_router` 已通过构建和测试；`hero_tf` 已在此前通过构建、单元测试和 TF 运行验证。
+
+## 2026-09-07 代码评估补充
+
+- 本次在既有构建产物上执行 `colcon test --event-handlers console_cohesion+ --return-code-on-test-failure`，14 个包完成，退出码 0；未重新构建，也未进行实车验证
+- 源码审阅发现待验证及修复边界：`gimbal_driver::sendCommand()` 未检查缓存控制命令年龄，仲裁器停止输出后仍会重发末条命令；`aim_normal` 未检查输入观测年龄，仅为生成的候选写当前时间，仲裁器的候选超时不能替代观测超时
+- 大恒后端读取了 `device_timestamp`，但上层未传递该字段，图像在取图和 BGR 转换完成后以 `now()` 打时间戳；实际采集时刻与 ROS 时钟的映射仍需实现及硬件验证
+- `resolveModelPath()` 与 `resolveVideoPath()` 向上查找目录时未处理根目录的父目录等于自身；相对资源路径不存在时可能持续循环，需补充终止条件

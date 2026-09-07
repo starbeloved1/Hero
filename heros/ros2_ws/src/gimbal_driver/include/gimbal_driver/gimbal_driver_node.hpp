@@ -102,6 +102,7 @@ private:
   std::string gimbal_frame_id_;
   uint8_t command_flag_{0x05U};
   bool enable_fire_{false};
+  double state_timestamp_offset_sec_{0.0};
   bool virtual_serial_{false};
   bool previous_up_{false};
   bool previous_down_{false};

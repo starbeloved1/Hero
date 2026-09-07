@@ -63,6 +63,7 @@ GimbalDriverNode::GimbalDriverNode()
   declare_parameter<std::string>("control_topic", "/hero/gimbal/control");
   declare_parameter<std::string>("gimbal_frame_id", "gimbal_link");
   declare_parameter<double>("state_publish_rate_hz", 200.0);
+  declare_parameter<double>("state_timestamp_offset_sec", 0.0);
   declare_parameter<double>("command_send_rate_hz", 200.0);
   declare_parameter<std::string>("antibase_packet_topic",
                                  "/hero/antibase/packets");
@@ -82,6 +83,11 @@ GimbalDriverNode::GimbalDriverNode()
   if (state_rate <= 0.0 || command_rate <= 0.0) {
     throw std::invalid_argument(
         "state_publish_rate_hz and command_send_rate_hz must be positive");
+  }
+  state_timestamp_offset_sec_ =
+      get_parameter("state_timestamp_offset_sec").as_double();
+  if (!std::isfinite(state_timestamp_offset_sec_)) {
+    throw std::invalid_argument("state_timestamp_offset_sec 必须是有限数");
   }
   const auto command_flag = get_parameter("command_flag").as_int();
   if (command_flag < 0 || command_flag > 255) {
@@ -201,7 +207,12 @@ void GimbalDriverNode::receiveState(const LegacyReadFrame &frame) {
   }
   previous_up_ = frame.up;
   previous_down_ = frame.down;
-  latest_state_ = CachedState{frame, now(), exposure_step};
+  // 真实串口没有下位机采样时刻，入口处立即记录主机接收时间；后续定时重发
+  // 缓存状态时必须保留该时刻，不能刷新为发布时刻。
+  latest_state_ = CachedState{
+      frame,
+      now() + rclcpp::Duration::from_seconds(state_timestamp_offset_sec_),
+      exposure_step};
 }
 
 void GimbalDriverNode::publishState() {

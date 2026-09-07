@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -27,6 +28,7 @@ struct DahengFrame
   std::uint32_t width{0};
   std::uint32_t height{0};
   std::uint64_t device_timestamp{0};
+  std::chrono::steady_clock::time_point host_receive_steady{};
   std::vector<std::uint8_t> bgr_data;
 };
 
@@ -40,6 +42,8 @@ public:
 
   bool open(const DahengCameraConfig & config, std::string & error);
   bool read(DahengFrame & frame, std::string & error);
+  bool timestampTickFrequencyHz(std::uint64_t & frequency_hz,
+                                std::string & error) const;
   void close();
 
 private:

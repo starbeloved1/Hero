@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <memory>
+#include <optional>
 #include <vector>
 
 #include <rclcpp/rclcpp.hpp>
@@ -22,6 +23,9 @@ private:
   void captureLoop(Stream & stream);
   bool readFrame(Stream & stream, Frame & frame, std::string & error);
   bool readVideoFrame(Stream & stream, Frame & frame, std::string & error);
+  std::optional<rclcpp::Time> makeFrameStamp(
+    Stream & stream, const Frame & frame, const rclcpp::Time & host_publish_stamp,
+    rclcpp::Time & host_receive_stamp, double & mapping_offset_sec);
 
   std::atomic<bool> running_{false};
   std::vector<std::unique_ptr<Stream>> streams_;

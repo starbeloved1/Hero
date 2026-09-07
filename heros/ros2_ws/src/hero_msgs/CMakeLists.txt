@@ -22,6 +22,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/AntiBasePacket.msg"
   "msg/AntiBaseTxStatus.msg"
   "msg/AntiBaseDebug.msg"
+  "msg/CameraTiming.msg"
   DEPENDENCIES builtin_interfaces geometry_msgs std_msgs
 )
 
