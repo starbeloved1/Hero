@@ -101,7 +101,7 @@ bool DahengCamera::configure(const DahengCameraConfig & config, std::string & er
          check(GXStreamOn(device_), error) && (stream_on_ = true);
 }
 
-bool DahengCamera::read(DahengFrame & frame, std::string & error)
+bool DahengCamera::read(DahengFrame & frame, bool convert_to_bgr, std::string & error)
 {
   PGX_FRAME_BUFFER buffer = nullptr;
   if (!check(GXDQBuf(device_, &buffer, 1500), error)) {
@@ -118,10 +118,15 @@ bool DahengCamera::read(DahengFrame & frame, std::string & error)
   frame.height = buffer->nHeight;
   frame.device_timestamp = buffer->nTimestamp;
   frame.host_receive_steady = std::chrono::steady_clock::now();
-  frame.bgr_data.resize(static_cast<std::size_t>(frame.width) * frame.height * 3U);
-  const auto convert_status = DxRaw8toRGB24Ex(
-    static_cast<unsigned char *>(buffer->pImgBuf), frame.bgr_data.data(), frame.width, frame.height,
-    RAW2RGB_NEIGHBOUR, static_cast<DX_PIXEL_COLOR_FILTER>(color_filter_), false, DX_ORDER_BGR);
+  GX_STATUS convert_status = GX_STATUS_SUCCESS;
+  if (convert_to_bgr) {
+    frame.bgr_data.resize(static_cast<std::size_t>(frame.width) * frame.height * 3U);
+    convert_status = DxRaw8toRGB24Ex(
+      static_cast<unsigned char *>(buffer->pImgBuf), frame.bgr_data.data(), frame.width, frame.height,
+      RAW2RGB_NEIGHBOUR, static_cast<DX_PIXEL_COLOR_FILTER>(color_filter_), false, DX_ORDER_BGR);
+  } else {
+    frame.bgr_data.clear();
+  }
   const auto queue_status = GXQBuf(device_, buffer);
   return check(convert_status, error) && check(queue_status, error);
 }

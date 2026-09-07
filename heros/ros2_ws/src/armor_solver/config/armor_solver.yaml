@@ -1,8 +1,7 @@
 armor_solver_node:
   ros__parameters:
     armor_topic: /hero/detector/armors
-    camera_info_topic: /hero/camera/selected/camera_info
-    gimbal_state_topic: /hero/gimbal/state
+    camera_info_topic: /hero/camera/aim8mm/camera_info
     armor_pose_topic: /hero/solver/armor_poses
 
     # 通过TF转到world坐标系

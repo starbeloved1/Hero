@@ -180,7 +180,7 @@ AimAntitopNode::AimAntitopNode()
                                  "/hero/solver/armor_poses");
   declare_parameter<std::string>("gimbal_state_topic", "/hero/gimbal/state");
   declare_parameter<std::string>("camera_info_topic",
-                                 "/hero/camera/selected/camera_info");
+                                 "/hero/camera/aim8mm/camera_info");
   declare_parameter<std::string>("control_candidate_topic",
                                  "/hero/aim/antitop/controller");
   declare_parameter<std::string>("debug_topic", "/hero/aim/antitop/debug");

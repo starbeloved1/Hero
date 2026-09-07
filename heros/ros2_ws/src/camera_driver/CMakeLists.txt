@@ -28,6 +28,11 @@ add_library(camera_source src/camera_source.cpp)
 target_compile_features(camera_source PUBLIC cxx_std_17)
 target_include_directories(camera_source PUBLIC include)
 
+add_library(camera_mode src/camera_mode.cpp)
+target_compile_features(camera_mode PUBLIC cxx_std_17)
+target_include_directories(camera_mode PUBLIC include)
+ament_target_dependencies(camera_mode hero_msgs)
+
 add_library(timestamp_mapper src/timestamp_mapper.cpp)
 target_compile_features(timestamp_mapper PUBLIC cxx_std_17)
 target_include_directories(timestamp_mapper PUBLIC include)
@@ -35,7 +40,7 @@ target_include_directories(timestamp_mapper PUBLIC include)
 add_executable(camera_driver_node src/main.cpp src/camera_driver_node.cpp)
 target_compile_features(camera_driver_node PUBLIC cxx_std_17)
 target_include_directories(camera_driver_node PRIVATE include)
-target_link_libraries(camera_driver_node daheng_camera camera_source timestamp_mapper ${OpenCV_LIBS})
+target_link_libraries(camera_driver_node daheng_camera camera_mode camera_source timestamp_mapper ${OpenCV_LIBS})
 ament_target_dependencies(camera_driver_node ament_index_cpp hero_msgs rclcpp sensor_msgs)
 
 if(BUILD_TESTING)
@@ -47,9 +52,14 @@ if(BUILD_TESTING)
   ament_add_gtest(test_timestamp_mapper test/test_timestamp_mapper.cpp)
   target_link_libraries(test_timestamp_mapper timestamp_mapper)
   target_include_directories(test_timestamp_mapper PRIVATE include)
+
+  ament_add_gtest(test_camera_mode test/test_camera_mode.cpp)
+  target_link_libraries(test_camera_mode camera_mode)
+  target_include_directories(test_camera_mode PRIVATE include)
+  ament_target_dependencies(test_camera_mode hero_msgs)
 endif()
 
-install(TARGETS daheng_camera camera_source timestamp_mapper camera_driver_node
+install(TARGETS daheng_camera camera_mode camera_source timestamp_mapper camera_driver_node
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME}

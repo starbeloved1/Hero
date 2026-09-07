@@ -57,7 +57,7 @@ std::string resolveModelPath(const std::string &configured_path) {
 
 DetectorNode::DetectorNode() : Node("armor_detector_node") {
   declare_parameter<std::string>("image_topic",
-                                 "/hero/camera/selected/image_raw");
+                                 "/hero/camera/aim8mm/image_raw");
   declare_parameter<std::string>("gimbal_state_topic", "/hero/gimbal/state");
   declare_parameter<std::string>("armor_topic", "/hero/detector/armors");
   declare_parameter<bool>("visualization_enabled", true);

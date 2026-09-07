@@ -1,6 +1,6 @@
 armor_detector_node:
   ros__parameters:
-    image_topic: /hero/camera/selected/image_raw
+    image_topic: /hero/camera/aim8mm/image_raw
     gimbal_state_topic: /hero/gimbal/state
     armor_topic: /hero/detector/armors
 

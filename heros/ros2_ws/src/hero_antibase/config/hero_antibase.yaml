@@ -1,7 +1,6 @@
 hero_antibase_node:
   ros__parameters:
-    # camera_router 在 mode4 自动将基地相机转发到 selected
-    image_topic: /hero/camera/selected/image_raw # sub
+    image_topic: /hero/camera/base/image_raw # sub
     gimbal_state_topic: /hero/gimbal/state # sub
     packet_topic: /hero/antibase/packets # pub
     tx_status_topic: /hero/antibase/tx_status # sub

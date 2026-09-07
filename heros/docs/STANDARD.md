@@ -4,11 +4,11 @@
 
 ## 命名
 
-- 新功能包采用英文职责名，不加 `hero_` 前缀，例如 `camera_driver`、`camera_router`、`armor_detector`、`armor_solver`、`tracker`、`controller`。
+- 新功能包采用英文职责名，不加 `hero_` 前缀，例如 `camera_driver`、`armor_detector`、`armor_solver`、`tracker`、`controller`。
 - 同一算法领域由 `src/` 下的目录分组；例如瞄准域统一放在 `ros2_ws/src/hero_aim/`，其中可包含算法库包和策略节点包。该目录只表达源码层级，内部每个目录仍是独立 ROS 功能包，包名和 topic 不随之增加前缀。
 - `hero_msgs` 是公共自定义消息包，固定保留原名。
 - ROS 话题统一位于 `/hero/...` 命名空间；消息字段、参数、坐标系、C++ 标识符均使用英文。
-- 包内文件采用 `snake_case`，不加 `hero_` 前缀。例如 `main.cpp`、`camera_router_node.cpp`、`camera_router.yaml`、`camera_router.launch.py`。
+- 包内文件采用 `snake_case`，不加 `hero_` 前缀。例如 `main.cpp`、`camera_driver_node.cpp`、`camera_driver.yaml`、`camera_driver.launch.py`。
 - 推理模型统一放在 `heros/model/`，不用 `models/`；功能包通过参数引用模型，不复制模型文件。
 - 命名空间通常与包名一致；结束注释为 `}  // package_name`，匿名命名空间为 `}  // namespace`。
 - 自定义坐标方向转换函数使用 `2`，例如 `makeCamera2Gimbal`、`makeFLU2RDF`。

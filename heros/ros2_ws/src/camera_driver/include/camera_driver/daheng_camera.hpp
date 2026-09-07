@@ -20,7 +20,6 @@ struct DahengCameraConfig
   std::int64_t offset_y{0};
   double exposure_time_us{4000.0};
   double gain{16.0};
-  double acquisition_rate_hz{0.0};
 };
 
 struct DahengFrame
@@ -41,7 +40,7 @@ public:
   DahengCamera & operator=(const DahengCamera &) = delete;
 
   bool open(const DahengCameraConfig & config, std::string & error);
-  bool read(DahengFrame & frame, std::string & error);
+  bool read(DahengFrame & frame, bool convert_to_bgr, std::string & error);
   bool timestampTickFrequencyHz(std::uint64_t & frequency_hz,
                                 std::string & error) const;
   void close();

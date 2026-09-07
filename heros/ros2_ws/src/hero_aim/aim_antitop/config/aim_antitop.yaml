@@ -6,8 +6,8 @@ aim_antitop_node:
 
     armor_pose_topic: /hero/solver/armor_poses # sub
     gimbal_state_topic: /hero/gimbal/state # sub
-    # 用 selected 的原始图像内参和畸变，将世界旋转中心重投影到同一像素平面
-    camera_info_topic: /hero/camera/selected/camera_info # sub
+    # 用主 8mm 相机的原始图像内参和畸变，将世界旋转中心重投影到同一像素平面
+    camera_info_topic: /hero/camera/aim8mm/camera_info # sub
     control_candidate_topic: /hero/aim/antitop/controller # pub
     debug_topic: /hero/aim/antitop/debug # pub
     # 3D 可视化：青色为 T0 观测板，橙色为标定三层与旋转轴，绿色为 Tcontrol 瞄点

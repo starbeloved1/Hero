@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <vector>
@@ -21,13 +22,17 @@ private:
   struct Frame;
 
   void captureLoop(Stream & stream);
-  bool readFrame(Stream & stream, Frame & frame, std::string & error);
-  bool readVideoFrame(Stream & stream, Frame & frame, std::string & error);
+  bool readFrame(Stream & stream, bool convert_to_bgr, Frame & frame, std::string & error);
+  bool readVideoFrame(Stream & stream, bool convert_to_bgr, Frame & frame, std::string & error);
   std::optional<rclcpp::Time> makeFrameStamp(
     Stream & stream, const Frame & frame, const rclcpp::Time & host_publish_stamp,
     rclcpp::Time & host_receive_stamp, double & mapping_offset_sec);
+  std::optional<rclcpp::Time> makeBaseFrameStamp(
+    Stream & stream, const Frame & frame, const rclcpp::Time & host_publish_stamp);
 
   std::atomic<bool> running_{false};
+  std::atomic<std::uint8_t> gimbal_mode_{1U};
+  rclcpp::SubscriptionBase::SharedPtr gimbal_state_sub_;
   std::vector<std::unique_ptr<Stream>> streams_;
 };
 

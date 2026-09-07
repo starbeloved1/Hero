@@ -21,7 +21,7 @@ rclcpp::QoS packetQos(int depth) {
 
 HeroAntiBaseNode::HeroAntiBaseNode() : Node("hero_antibase_node") {
   declare_parameter<std::string>("image_topic",
-                                 "/hero/camera/selected/image_raw");
+                                 "/hero/camera/base/image_raw");
   declare_parameter<std::string>("gimbal_state_topic", "/hero/gimbal/state");
   declare_parameter<std::string>("packet_topic", "/hero/antibase/packets");
   declare_parameter<std::string>("tx_status_topic",
