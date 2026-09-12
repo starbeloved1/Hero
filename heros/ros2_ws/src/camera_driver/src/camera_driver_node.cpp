@@ -17,7 +17,6 @@
 #include <sensor_msgs/msg/camera_info.hpp>
 #include <sensor_msgs/msg/image.hpp>
 
-#include <hero_msgs/msg/camera_timing.hpp>
 #include <hero_msgs/msg/gimbal_state.hpp>
 
 #include "camera_driver/camera_mode.hpp"
@@ -66,13 +65,12 @@ struct CameraDriverNode::Stream
   struct AimData
   {
     TimestampMode timestamp_mode{TimestampMode::kHost};
-    double timestamp_offset_sec{0.0};
+    double timestamp_offset{0.0};
     std::uint64_t device_timestamp_frequency_hz{0U};
     DeviceTimestampMapper timestamp_mapper;
     std::optional<std::int64_t> ros_to_steady_offset_ns;
     sensor_msgs::msg::CameraInfo camera_info;
     rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr camera_info_pub;
-    rclcpp::Publisher<hero_msgs::msg::CameraTiming>::SharedPtr timing_pub;
   };
 
   std::string name;
@@ -122,8 +120,7 @@ CameraDriverNode::CameraDriverNode()
   }
 
   declare_parameter<std::string>("aim8mm.timestamp_mode", "host");
-  declare_parameter<double>("aim8mm.timestamp_offset_sec", 0.0);
-  declare_parameter<std::string>("aim8mm.timing_topic", "/hero/camera/aim8mm/timing");
+  declare_parameter<double>("aim8mm.timestamp_offset", 0.0);
   declare_parameter<std::string>("aim8mm.camera_info_topic", "/hero/camera/aim8mm/camera_info");
   declare_parameter<double>("aim8mm.fx", 0.0);
   declare_parameter<double>("aim8mm.fy", 0.0);
@@ -155,9 +152,9 @@ CameraDriverNode::CameraDriverNode()
         stream->aim.emplace();
         auto & aim = *stream->aim;
         aim.timestamp_mode = parseTimestampMode(get_parameter("aim8mm.timestamp_mode").as_string());
-        aim.timestamp_offset_sec = get_parameter("aim8mm.timestamp_offset_sec").as_double();
-        if (!std::isfinite(aim.timestamp_offset_sec)) {
-          throw std::runtime_error("aim8mm timestamp_offset_sec 必须是有限数");
+        aim.timestamp_offset = get_parameter("aim8mm.timestamp_offset").as_double();
+        if (!std::isfinite(aim.timestamp_offset)) {
+          throw std::runtime_error("aim8mm timestamp_offset 必须是有限数");
         }
       }
 
@@ -221,13 +218,11 @@ CameraDriverNode::CameraDriverNode()
       if (stream->aim.has_value()) {
         auto & aim = *stream->aim;
         const auto camera_info_topic = get_parameter("aim8mm.camera_info_topic").as_string();
-        const auto timing_topic = get_parameter("aim8mm.timing_topic").as_string();
-        if (camera_info_topic.empty() || timing_topic.empty()) {
-          throw std::runtime_error("aim8mm CameraInfo 与 timing 话题不能为空");
+        if (camera_info_topic.empty()) {
+          throw std::runtime_error("aim8mm CameraInfo 话题不能为空");
         }
         aim.camera_info_pub = create_publisher<sensor_msgs::msg::CameraInfo>(
           camera_info_topic, highRateQos());
-        aim.timing_pub = create_publisher<hero_msgs::msg::CameraTiming>(timing_topic, highRateQos());
         aim.camera_info.width = static_cast<std::uint32_t>(config.width);
         aim.camera_info.height = static_cast<std::uint32_t>(config.height);
         aim.camera_info.distortion_model = "plumb_bob";
@@ -318,9 +313,8 @@ void CameraDriverNode::captureLoop(Stream & stream)
 
     const auto host_publish_stamp = now();
     rclcpp::Time host_receive_stamp{0, 0, RCL_ROS_TIME};
-    double mapping_offset_sec = 0.0;
     const auto stamp = stream.aim.has_value() ?
-      makeFrameStamp(stream, frame, host_publish_stamp, host_receive_stamp, mapping_offset_sec) :
+      makeFrameStamp(stream, frame, host_publish_stamp, host_receive_stamp) :
       makeBaseFrameStamp(stream, frame, host_publish_stamp);
     if (!stamp.has_value()) {
       if (stream.source == CameraSource::kVideo) {
@@ -344,20 +338,6 @@ void CameraDriverNode::captureLoop(Stream & stream)
       auto info = aim.camera_info;
       info.header = image.header;
       aim.camera_info_pub->publish(info);
-      if (aim.timing_pub->get_subscription_count() > 0U) {
-        hero_msgs::msg::CameraTiming timing;
-        timing.header = image.header;
-        timing.device_timestamp = aim.timestamp_mode == TimestampMode::kDevice ?
-          frame.device_timestamp : 0U;
-        timing.device_timestamp_frequency_hz = aim.timestamp_mode == TimestampMode::kDevice ?
-          aim.device_timestamp_frequency_hz : 0U;
-        timing.host_receive_stamp = host_receive_stamp;
-        timing.host_publish_stamp = host_publish_stamp;
-        timing.timestamp_mode = timestampModeName(aim.timestamp_mode);
-        timing.device_to_host_offset_sec = mapping_offset_sec;
-        timing.reset_count = aim.timestamp_mapper.resetCount();
-        aim.timing_pub->publish(timing);
-      }
     }
     if (stream.source == CameraSource::kVideo) {
       std::this_thread::sleep_until(next_video_frame_time);
@@ -467,10 +447,9 @@ std::optional<rclcpp::Time> CameraDriverNode::makeBaseFrameStamp(
 
 std::optional<rclcpp::Time> CameraDriverNode::makeFrameStamp(
   Stream & stream, const Frame & frame, const rclcpp::Time & host_publish_stamp,
-  rclcpp::Time & host_receive_stamp, double & mapping_offset_sec)
+  rclcpp::Time & host_receive_stamp)
 {
   auto & aim = *stream.aim;
-  mapping_offset_sec = 0.0;
   const auto steady_now = std::chrono::steady_clock::now();
   const auto steady_now_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
     steady_now.time_since_epoch()).count();
@@ -480,7 +459,7 @@ std::optional<rclcpp::Time> CameraDriverNode::makeFrameStamp(
   host_receive_stamp = rclcpp::Time(receive_steady_ns + ros_to_steady_ns, RCL_ROS_TIME);
   if (aim.timestamp_mode == TimestampMode::kHost) {
     const auto stamp = host_receive_stamp +
-      rclcpp::Duration::from_seconds(aim.timestamp_offset_sec);
+      rclcpp::Duration::from_seconds(aim.timestamp_offset);
     if (stream.last_image_stamp.has_value() && stamp <= *stream.last_image_stamp) {
       RCLCPP_WARN_THROTTLE(
         get_logger(), *get_clock(), 2000, "%s 主机时间戳未递增，丢弃当前图像", stream.name.c_str());
@@ -517,11 +496,10 @@ std::optional<rclcpp::Time> CameraDriverNode::makeFrameStamp(
       stream.name.c_str());
     return std::nullopt;
   }
-  mapping_offset_sec = mapping.residual_offset_sec;
   const auto mapped_stamp = rclcpp::Time(
     mapping.mapped_host_steady_ns + ros_to_steady_ns, RCL_ROS_TIME);
   const auto stamp = std::min(mapped_stamp, host_receive_stamp) +
-    rclcpp::Duration::from_seconds(aim.timestamp_offset_sec);
+    rclcpp::Duration::from_seconds(aim.timestamp_offset);
   if (stream.last_image_stamp.has_value() && stamp <= *stream.last_image_stamp) {
     RCLCPP_WARN_THROTTLE(
       get_logger(), *get_clock(), 2000, "%s 设备映射时间戳未递增，丢弃当前图像", stream.name.c_str());

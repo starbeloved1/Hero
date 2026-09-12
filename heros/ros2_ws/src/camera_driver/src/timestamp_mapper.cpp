@@ -19,17 +19,6 @@ TimestampMode parseTimestampMode(const std::string & mode_name)
                               mode_name);
 }
 
-const char * timestampModeName(TimestampMode mode)
-{
-  switch (mode) {
-  case TimestampMode::kHost:
-    return "host";
-  case TimestampMode::kDevice:
-    return "device";
-  }
-  return "unknown";
-}
-
 bool hasRosSteadyClockJump(std::int64_t previous_offset_ns,
                            std::int64_t current_offset_ns,
                            std::int64_t threshold_ns)

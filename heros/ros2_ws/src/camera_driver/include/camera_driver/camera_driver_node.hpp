@@ -26,7 +26,7 @@ private:
   bool readVideoFrame(Stream & stream, bool convert_to_bgr, Frame & frame, std::string & error);
   std::optional<rclcpp::Time> makeFrameStamp(
     Stream & stream, const Frame & frame, const rclcpp::Time & host_publish_stamp,
-    rclcpp::Time & host_receive_stamp, double & mapping_offset_sec);
+    rclcpp::Time & host_receive_stamp);
   std::optional<rclcpp::Time> makeBaseFrameStamp(
     Stream & stream, const Frame & frame, const rclcpp::Time & host_publish_stamp);
 

@@ -7,8 +7,7 @@ armor_detector_node:
     # 可视化选择
     visualization_enabled: true
     visualization_topic: /hero/detector/visualization
-    # 0 表示跟随每个已处理输入
-    visualization_rate_hz: 0.0
+    visualization_rate_hz: 0.0 # 0表示跟随原始输入
 
     model_path: model/0526.onnx
     inference_device: GPU

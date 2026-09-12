@@ -15,9 +15,7 @@ gimbal_driver_node:
     control_topic: /hero/gimbal/control # sub
     gimbal_frame_id: gimbal_link
     state_publish_rate_hz: 200.0
-    # 真实串口状态接收时刻的人工补偿，正值推后、负值提前
-    # virtual 模式不使用该参数
-    state_timestamp_offset_sec: 0.0
+    state_timestamp_offset: 0.0 # 真实串口状态接收时刻的人工补偿，设正值
     command_send_rate_hz: 200.0
 
     antibase_packet_topic: /hero/antibase/packets # sub
@@ -25,8 +23,7 @@ gimbal_driver_node:
     antibase_min_packet_gap_ms: 21.0
     antibase_chunk_gap_ms: 2.0
     antibase_queue_depth: 64
-    # 仅本地裁判/MQTT 闭环测试启用：五个串口分片写成功后，将同一完整 300B
-    # 逻辑包镜像到 localhost 的裁判模拟器。实车必须保持 false
+    # 仅本地裁判/MQTT 闭环测试启用：五个串口分片写成功后，将同一完整 300B逻辑包镜像到 localhost 的裁判模拟器。比赛测试保持 false
     antibase_udp_mirror_enabled: false
     antibase_udp_mirror_host: 127.0.0.1
     antibase_udp_mirror_port: 9999
