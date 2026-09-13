@@ -7,5 +7,5 @@
     air_density_kgpm3: 1.169
     bullet_mass_kg: 0.041
     bullet_radius_m: 0.02125
-    muzzle_offset_m: 0.28
+    muzzle_offset_m: 0.28 # 枪口到发射点距离
     ballistic_iteration_count: 10 # 弹道迭代次数

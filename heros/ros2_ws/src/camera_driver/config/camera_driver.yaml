@@ -9,7 +9,7 @@ camera_driver_node:
     aim8mm.video_loop: true
     aim8mm.video_rate_hz: 0.0
     aim8mm.timestamp_mode: host
-    aim8mm.timestamp_offset: 0.0 # sec
+    aim8mm.timestamp_offset: 0.0 # sec，图像到达延迟补偿，设负值
     aim8mm.frame_id: camera_optical_frame
     aim8mm.image_topic: /hero/camera/aim8mm/image_raw
     aim8mm.camera_info_topic: /hero/camera/aim8mm/camera_info

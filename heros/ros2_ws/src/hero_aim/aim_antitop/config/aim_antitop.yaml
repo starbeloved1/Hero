@@ -15,10 +15,8 @@ aim_antitop_node:
     visualization_topic: /hero/aim/antitop/markers # pub
     target_frame_id: world
 
-    # 仅选择前哨站
     outpost_armor_id: 7
 
-    # 最大保存数据量
     center_window_size: 300
     minimum_center_samples: 10
 
@@ -46,6 +44,6 @@ aim_antitop_node:
     minimum_period_sec: 0.5
     maximum_period_sec: 1.0
     maximum_period_history_size: 20
-    system_delay_sec: 0.05
+    system_delay_sec: 0.05 # 系统延迟
     clockwise_time_bias_sec: 0.0
     counterclockwise_time_bias_sec: 0.0

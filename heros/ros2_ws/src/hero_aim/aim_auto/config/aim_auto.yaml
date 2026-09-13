@@ -12,7 +12,7 @@ aim_auto_node:
     visualization_topic: /hero/aim/autoaim/controller/markers
     target_frame_id: world
 
-    system_response_time_sec: 0.05 # 云台相应延时
+    system_response_time_sec: 0.05 # 链路延时补偿
     high_spin_threshold_radps: 2.0 # 高速模式阈值
     coming_angle_deg: 60.0
     leaving_angle_deg: 40.0

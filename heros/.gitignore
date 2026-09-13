@@ -19,5 +19,6 @@ core.*
 .idea/
 .vscode/
 
-
+/notes/*
+/docs/*
 

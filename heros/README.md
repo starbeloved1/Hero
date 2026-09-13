@@ -2,18 +2,6 @@
 
 面向 RoboMaster 英雄机器人的 ROS 2 工程，包含双相机驱动、装甲板检测、PnP 解算、TF、三种瞄准策略、云台串口通信和反基地视频传输。
 
-
-## 工作模式
-
-| Mode | 功能 | 数据链路 |
-| --- | --- | --- |
-| 1 | 普通瞄准 | aim8mm → detector → solver → aim_normal |
-| 2 | 反前哨 | aim8mm → detector → solver → aim_antitop |
-| 3 | 预测自瞄 | aim8mm → detector → solver → predictor → aim_auto |
-| 4 | 反基地 | base → hero_antibase → gimbal_driver |
-
-三个瞄准策略的候选命令由 `command_mux` 按 mode 仲裁，最终通过 `/hero/gimbal/control` 发送给 `gimbal_driver`。
-
 ## 环境
 
 - Ubuntu 22.04

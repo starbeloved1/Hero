@@ -15,7 +15,7 @@ gimbal_driver_node:
     control_topic: /hero/gimbal/control # sub
     gimbal_frame_id: gimbal_link
     state_publish_rate_hz: 200.0
-    state_timestamp_offset: 0.0 # 真实串口状态接收时刻的人工补偿，设正值
+    state_timestamp_offset: 0.0 # sec，真实串口状态接收时刻的人工补偿，设负值
     command_send_rate_hz: 200.0
 
     antibase_packet_topic: /hero/antibase/packets # sub
