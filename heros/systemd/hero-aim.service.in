@@ -1,0 +1,19 @@
+[Unit]
+Description=Hero ROS 2 aim system
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=@HERO_USER@
+WorkingDirectory=@HERO_PROJECT_DIR@
+ExecStartPre=/usr/bin/test -f @HERO_PROJECT_DIR@/ros2_ws/install/setup.bash
+ExecStart=@HERO_PROJECT_DIR@/run.sh
+Restart=on-failure
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=20
+KillMode=control-group
+
+[Install]
+WantedBy=multi-user.target

@@ -25,17 +25,25 @@ fi
 source "${project_dir}/ros2_ws/install/setup.bash"
 
 pids=()
+cleanup_started=false
 
 cleanup() {
+  if [[ "${cleanup_started}" == true ]]; then
+    return
+  fi
+  cleanup_started=true
   for pid in "${pids[@]}"; do
     if kill -0 "${pid}" 2>/dev/null; then
       kill -INT "${pid}" 2>/dev/null || true
     fi
   done
+  for pid in "${pids[@]}"; do
+    wait "${pid}" 2>/dev/null || true
+  done
 }
 
 trap cleanup EXIT
-trap 'cleanup; exit 0' INT TERM
+trap 'exit 0' INT TERM
 
 # 各功能包自行读取其 config 目录下的 YAML，不在这里覆盖参数
 ros2 launch gimbal_driver gimbal_driver.launch.py &
@@ -71,7 +79,16 @@ pids+=("$!")
 ros2 launch command_mux command_mux.launch.py &
 pids+=("$!")
 
-ros2 launch foxglove_bridge foxglove_bridge_launch.xml &
+ros2 launch foxglove_bridge foxglove_bridge_launch.xml address:=0.0.0.0 port:=8765 &
 pids+=("$!")
 
-wait
+set +e
+wait -n "${pids[@]}"
+child_status=$?
+set -e
+
+if (( child_status == 0 )); then
+  child_status=1
+fi
+echo "ROS 子进程已退出，停止整套系统（状态码 ${child_status}）" >&2
+exit "${child_status}"
