@@ -76,7 +76,7 @@ struct CameraDriverNode::Stream
   std::string name;
   CameraRole role{CameraRole::kAim8mm};
   std::string frame_id;
-  CameraSource source{CameraSource::kDaheng};
+  CameraSource source{CameraSource::kCamera};
   DahengCamera camera;
   cv::VideoCapture video;
   bool video_loop{true};
@@ -102,7 +102,7 @@ CameraDriverNode::CameraDriverNode()
   declare_parameter<std::string>("gimbal_state_topic", "/hero/gimbal/state");
   for (const auto & name : {"aim8mm", "base"}) {
     declare_parameter<bool>(std::string(name) + ".enabled", true);
-    declare_parameter<std::string>(std::string(name) + ".source", "daheng");
+    declare_parameter<std::string>(std::string(name) + ".source", "camera");
     declare_parameter<std::string>(std::string(name) + ".serial_number", "");
     declare_parameter<std::string>(std::string(name) + ".video_path", "");
     declare_parameter<bool>(std::string(name) + ".video_loop", true);
@@ -158,7 +158,7 @@ CameraDriverNode::CameraDriverNode()
         }
       }
 
-      if (stream->source == CameraSource::kDaheng) {
+      if (stream->source == CameraSource::kCamera) {
         std::string error;
         if (!stream->camera.open(config, error)) {
           throw std::runtime_error(std::string(name) + " 相机打开失败：" + error);

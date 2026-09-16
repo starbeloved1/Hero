@@ -7,7 +7,7 @@ namespace camera_driver
 
 enum class CameraSource
 {
-  kDaheng,
+  kCamera,
   kVideo,
 };
 

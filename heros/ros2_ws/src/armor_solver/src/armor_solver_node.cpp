@@ -233,6 +233,8 @@ void ArmorSolverNode::receiveArmors(const hero_msgs::msg::ArmorArray::ConstShare
       pose.header.frame_id = target_frame_id_;
       pose.pose = transformed_pose.pose;
     }
+    pose.distance = static_cast<float>(std::hypot(
+        pose.pose.position.x, pose.pose.position.y));
     output.armors.push_back(std::move(pose));
   }
 

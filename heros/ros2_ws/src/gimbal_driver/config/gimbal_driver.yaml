@@ -7,7 +7,7 @@ gimbal_driver_node:
     enable_fire: true
     command_flag: 1
 
-    virtual_mode: 1
+    virtual_mode: 2
     # 己方颜色：0蓝色，1红色
     virtual_robot_color: 0
     

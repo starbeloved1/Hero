@@ -6,7 +6,7 @@
 
 TEST(CameraSource, ParsesSupportedSources)
 {
-  EXPECT_EQ(camera_driver::parseCameraSource("daheng"), camera_driver::CameraSource::kDaheng);
+  EXPECT_EQ(camera_driver::parseCameraSource("camera"), camera_driver::CameraSource::kCamera);
   EXPECT_EQ(camera_driver::parseCameraSource("video"), camera_driver::CameraSource::kVideo);
 }
 

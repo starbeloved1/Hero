@@ -111,7 +111,6 @@ AimNormalNode::AimNormalNode()
   declare_parameter<std::string>("armor_pose_topic", "/hero/solver/armor_poses");
   declare_parameter<std::string>("gimbal_state_topic", "/hero/gimbal/state");
   declare_parameter<std::string>("control_candidate_topic", "/hero/aim/normalaim/controller");
-  declare_parameter<std::string>("debug_topic", "/hero/aim/normalaim/debug");
   declare_parameter<bool>("visualization_enabled", true);
   declare_parameter<std::string>("visualization_topic", "/hero/aim/normalaim/markers");
   declare_parameter<std::string>("target_frame_id", "world");
@@ -164,18 +163,16 @@ AimNormalNode::AimNormalNode()
   const auto armor_pose_topic = get_parameter("armor_pose_topic").as_string();
   const auto gimbal_state_topic = get_parameter("gimbal_state_topic").as_string();
   const auto control_candidate_topic = get_parameter("control_candidate_topic").as_string();
-  const auto debug_topic = get_parameter("debug_topic").as_string();
   const auto visualization_topic = get_parameter("visualization_topic").as_string();
   if (
     target_frame_id_.empty() || armor_pose_topic.empty() || gimbal_state_topic.empty() ||
-    control_candidate_topic.empty() || debug_topic.empty())
+    control_candidate_topic.empty())
   {
     throw std::invalid_argument("普通瞄准策略字符串参数无效");
   }
 
   const auto qos = highRateQos();
   control_candidate_pub_ = create_publisher<hero_msgs::msg::ControlCommand>(control_candidate_topic, qos);
-  debug_pub_ = create_publisher<hero_msgs::msg::NormalAimDebug>(debug_topic, qos);
   if (get_parameter("visualization_enabled").as_bool()) {
     if (visualization_topic.empty()) {
       throw std::invalid_argument("普通瞄准可视化话题不能为空");
@@ -237,7 +234,6 @@ void AimNormalNode::receiveArmorPoses(const hero_msgs::msg::ArmorPoseArray::Cons
   const auto result = aimer_.aim(
     observations, latest_gimbal_state_->yaw, latest_gimbal_state_->pitch);
   const bool shoot_status = result.has_value() && enable_fire_ && !result->selected.held_target;
-  publishDebug(*message, result, shoot_status);
   publishVisualization(*message, result);
   if (!result.has_value() || !enabled_) {
     return;
@@ -251,34 +247,6 @@ void AimNormalNode::receiveArmorPoses(const hero_msgs::msg::ArmorPoseArray::Cons
   command.shoot_status = shoot_status ? 1U : 0U;
   command.target_id = result->selected.observation.id;
   control_candidate_pub_->publish(command);
-}
-
-void AimNormalNode::publishDebug(
-  const hero_msgs::msg::ArmorPoseArray & message,
-  const std::optional<NormalAimResult> & result, bool shoot_status)
-{
-  if (debug_pub_->get_subscription_count() == 0U) {
-    return;
-  }
-
-  hero_msgs::msg::NormalAimDebug debug;
-  debug.header = message.header;
-  debug.valid = result.has_value();
-  if (result.has_value()) {
-    debug.held_target = result->selected.held_target;
-    debug.lost_frames = result->selected.lost_frames;
-    debug.target_id = result->selected.observation.id;
-    debug.target_position.x = result->selected.observation.x;
-    debug.target_position.y = result->selected.observation.y;
-    debug.target_position.z = result->selected.observation.z;
-    debug.raw_yaw = static_cast<float>(result->raw_yaw_rad);
-    debug.raw_pitch = static_cast<float>(result->raw_pitch_rad);
-    debug.command_yaw = static_cast<float>(result->command_yaw_rad);
-    debug.command_pitch = static_cast<float>(result->command_pitch_rad);
-    debug.flight_time_sec = static_cast<float>(result->flight_time_sec);
-    debug.shoot_status = shoot_status;
-  }
-  debug_pub_->publish(debug);
 }
 
 void AimNormalNode::publishVisualization(
