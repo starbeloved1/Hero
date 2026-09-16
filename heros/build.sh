@@ -23,5 +23,5 @@ if [[ -d "${hero_openvino_root}/libs" ]]; then
   export LD_LIBRARY_PATH="${hero_openvino_root}/libs:${LD_LIBRARY_PATH:-}"
 fi
 
-cd "${project_dir}/ros2_ws"
-colcon build --symlink-install "$@"
+cd "${project_dir}/ros2_ws"。
+colcon build --symlink-install "$@" --cmake-args -DCMAKE_BUILD_TYPE=Release
