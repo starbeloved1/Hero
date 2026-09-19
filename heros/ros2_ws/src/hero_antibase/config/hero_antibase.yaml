@@ -8,7 +8,7 @@ hero_antibase_node:
     packet_queue_depth: 64
 
     # 仅用于 Foxglove 查看送入编码器的图像
-    visualization_enabled: false
+    visualization_enabled: true
     visualization_topic: /hero/antibase/visualization
     visualization_rate_hz: 0.0
 

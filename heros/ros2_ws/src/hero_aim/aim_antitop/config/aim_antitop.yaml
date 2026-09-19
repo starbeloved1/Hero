@@ -13,6 +13,10 @@ aim_antitop_node:
     # 3D 可视化：青色为 T0 观测板，橙色为标定三层与旋转轴，绿色为 Tcontrol 瞄点
     visualization_enabled: true
     visualization_topic: /hero/aim/antitop/markers # pub
+    # 2D 过程可视化：在原始图像上画旋转中心、射击区及状态；仅在有订阅者时处理。
+    image_visualization_enabled: true
+    image_topic: /hero/camera/aim8mm/image_raw # sub
+    image_visualization_topic: /hero/aim/antitop/visualization # pub
     target_frame_id: world
 
     outpost_armor_id: 7

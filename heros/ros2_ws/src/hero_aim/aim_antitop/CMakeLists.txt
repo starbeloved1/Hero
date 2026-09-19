@@ -7,6 +7,7 @@ endif()
 
 find_package(ament_cmake REQUIRED)
 find_package(aim_core REQUIRED)
+find_package(cv_bridge REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(hero_msgs REQUIRED)
@@ -29,7 +30,7 @@ add_executable(aim_antitop_node src/main.cpp src/aim_antitop_node.cpp)
 target_compile_features(aim_antitop_node PUBLIC cxx_std_17)
 target_include_directories(aim_antitop_node PRIVATE include)
 target_link_libraries(aim_antitop_node aim_antitop_core ${OpenCV_LIBS})
-ament_target_dependencies(aim_antitop_node aim_core hero_msgs rclcpp sensor_msgs tf2 tf2_geometry_msgs tf2_ros visualization_msgs)
+ament_target_dependencies(aim_antitop_node aim_core cv_bridge hero_msgs rclcpp sensor_msgs tf2 tf2_geometry_msgs tf2_ros visualization_msgs)
 
 install(TARGETS aim_antitop_core aim_antitop_node
   ARCHIVE DESTINATION lib

@@ -1,5 +1,6 @@
 #include "aim_antitop/aim_antitop_node.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <stdexcept>
@@ -7,8 +8,14 @@
 #include <vector>
 
 #include <geometry_msgs/msg/point_stamped.hpp>
+#if __has_include(<cv_bridge/cv_bridge.hpp>)
+#include <cv_bridge/cv_bridge.hpp>
+#else
+#include <cv_bridge/cv_bridge.h>
+#endif
 #include <opencv2/calib3d.hpp>
 #include <opencv2/core.hpp>
+#include <opencv2/imgproc.hpp>
 #include <tf2/time.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <visualization_msgs/msg/marker.hpp>
@@ -18,6 +25,7 @@ namespace aim_antitop {
 namespace {
 
 constexpr double kPi = 3.14159265358979323846;
+constexpr std::size_t kImageCacheSize = 20U;
 
 rclcpp::QoS highRateQos() {
   return rclcpp::QoS(rclcpp::KeepLast(1)).best_effort().durability_volatile();
@@ -28,15 +36,9 @@ double stampToSeconds(const builtin_interfaces::msg::Time &stamp) {
          static_cast<double>(stamp.nanosec) * 1e-9;
 }
 
-builtin_interfaces::msg::Time secondsToStamp(double seconds) {
-  builtin_interfaces::msg::Time stamp;
-  if (!std::isfinite(seconds) || seconds < 0.0) {
-    return stamp;
-  }
-  const auto nanoseconds = static_cast<std::int64_t>(seconds * 1e9);
-  stamp.sec = static_cast<std::int32_t>(nanoseconds / 1000000000LL);
-  stamp.nanosec = static_cast<std::uint32_t>(nanoseconds % 1000000000LL);
-  return stamp;
+bool hasSameStamp(const builtin_interfaces::msg::Time &left,
+                  const builtin_interfaces::msg::Time &right) {
+  return left.sec == right.sec && left.nanosec == right.nanosec;
 }
 
 std::size_t positiveSizeParameter(const rclcpp::Node &node, const char *name) {
@@ -187,6 +189,11 @@ AimAntitopNode::AimAntitopNode()
   declare_parameter<bool>("visualization_enabled", true);
   declare_parameter<std::string>("visualization_topic",
                                  "/hero/aim/antitop/markers");
+  declare_parameter<bool>("image_visualization_enabled", true);
+  declare_parameter<std::string>("image_topic",
+                                 "/hero/camera/aim8mm/image_raw");
+  declare_parameter<std::string>("image_visualization_topic",
+                                 "/hero/aim/antitop/visualization");
   declare_parameter<std::string>("target_frame_id", "world");
   declare_parameter<int>("outpost_armor_id", 7);
   declare_parameter<int>("center_window_size", 300);
@@ -274,6 +281,8 @@ AimAntitopNode::AimAntitopNode()
       get_parameter("enter_zone_threshold_px").as_double();
   controller_config.exit_zone_threshold_px =
       get_parameter("exit_zone_threshold_px").as_double();
+  enter_zone_threshold_px_ = controller_config.enter_zone_threshold_px;
+  exit_zone_threshold_px_ = controller_config.exit_zone_threshold_px;
   controller_config.recent_z_window_size =
       positiveSizeParameter(*this, "recent_z_window_size");
   controller_config.z_runtime_match_threshold_m =
@@ -321,6 +330,11 @@ AimAntitopNode::AimAntitopNode()
       get_parameter("visualization_enabled").as_bool();
   const auto visualization_topic =
       get_parameter("visualization_topic").as_string();
+  const auto image_visualization_enabled =
+      get_parameter("image_visualization_enabled").as_bool();
+  const auto image_topic = get_parameter("image_topic").as_string();
+  const auto image_visualization_topic =
+      get_parameter("image_visualization_topic").as_string();
   if (target_frame_id_.empty() || armor_pose_topic.empty() ||
       gimbal_state_topic.empty() || camera_info_topic.empty() ||
       control_candidate_topic.empty() || debug_topic.empty()) {
@@ -337,6 +351,18 @@ AimAntitopNode::AimAntitopNode()
     }
     visualization_pub_ = create_publisher<visualization_msgs::msg::MarkerArray>(
         visualization_topic, qos);
+  }
+  if (image_visualization_enabled) {
+    if (image_topic.empty() || image_visualization_topic.empty()) {
+      throw std::invalid_argument("反前哨图像可视化话题不能为空");
+    }
+    image_visualization_pub_ = create_publisher<sensor_msgs::msg::Image>(
+        image_visualization_topic, qos);
+    image_sub_ = create_subscription<sensor_msgs::msg::Image>(
+        image_topic, qos,
+        [this](const sensor_msgs::msg::Image::ConstSharedPtr message) {
+          receiveImage(message);
+        });
   }
   gimbal_state_sub_ = create_subscription<hero_msgs::msg::GimbalState>(
       gimbal_state_topic, qos,
@@ -361,6 +387,10 @@ AimAntitopNode::AimAntitopNode()
               "反前哨节点已启动：输入 %s，候选输出 %s，当前%s、%s开火",
               armor_pose_topic.c_str(), control_candidate_topic.c_str(),
               enabled_ ? "启用" : "禁用", enable_fire_ ? "允许" : "禁止");
+  if (image_visualization_pub_) {
+    RCLCPP_INFO(get_logger(), "反前哨图像可视化已启用：%s",
+                image_visualization_topic.c_str());
+  }
 }
 
 void AimAntitopNode::receiveGimbalState(
@@ -393,6 +423,19 @@ void AimAntitopNode::receiveCameraInfo(
     return;
   }
   latest_camera_info_ = *message;
+}
+
+void AimAntitopNode::receiveImage(
+    const sensor_msgs::msg::Image::ConstSharedPtr &message) {
+  if (!image_visualization_pub_ ||
+      image_visualization_pub_->get_subscription_count() == 0U) {
+    return;
+  }
+  std::lock_guard<std::mutex> lock(image_mutex_);
+  recent_images_.push_back(message);
+  while (recent_images_.size() > kImageCacheSize) {
+    recent_images_.pop_front();
+  }
 }
 
 std::optional<double> AimAntitopNode::projectRotationCenterX(
@@ -509,9 +552,10 @@ void AimAntitopNode::receiveArmorPoses(
   }
   const bool shoot_status = controller_result.has_value() && enable_fire_ &&
                             controller_result->shoot_ready;
-  publishDebug(*message, tracker_state, result, center_image_x_px,
-               controller_result, shoot_status, control_time);
+  publishDebug(tracker_state, controller_result, control_time);
   publishVisualization(*message, tracker_state, result, control_time);
+  publishImageVisualization(*message, tracker_state, center_image_x_px,
+                            controller_result);
   if (!enabled_ || !result.has_value()) {
     return;
   }
@@ -527,68 +571,144 @@ void AimAntitopNode::receiveArmorPoses(
 }
 
 void AimAntitopNode::publishDebug(
-    const hero_msgs::msg::ArmorPoseArray &message,
     const std::optional<AntitopTrackerState> &tracker_state,
-    const std::optional<AntitopAimResult> &result,
-    const std::optional<double> &center_image_x_px,
     const std::optional<AntitopControllerResult> &controller_result,
-    bool shoot_status, const rclcpp::Time &control_time) {
+    const rclcpp::Time &control_time) {
   if (debug_pub_->get_subscription_count() == 0U) {
     return;
   }
   hero_msgs::msg::AntitopDebug debug;
   debug.header.stamp = control_time;
   debug.header.frame_id = target_frame_id_;
-  debug.measurement_stamp = message.header.stamp;
   debug.tracking_valid = tracker_state.has_value();
-  debug.fire_enabled = enable_fire_;
-  debug.shoot_status = shoot_status;
   if (tracker_state.has_value()) {
     debug.center_valid = tracker_state->center_valid;
     debug.calibrated = tracker_state->calibrated;
-    debug.target_id = tracker_state->tracked_armor.id;
-    debug.tracked_position.x = tracker_state->tracked_armor.position_m.x();
-    debug.tracked_position.y = tracker_state->tracked_armor.position_m.y();
-    debug.tracked_position.z = tracker_state->tracked_armor.position_m.z();
-    debug.rotation_center.x = tracker_state->rotation_center_m.x();
-    debug.rotation_center.y = tracker_state->rotation_center_m.y();
-    debug.rotation_center.z = tracker_state->rotation_center_m.z();
-    debug.center_sample_count =
-        static_cast<std::uint32_t>(tracker_state->center_sample_count);
-    debug.calibration_sample_count =
-        static_cast<std::uint32_t>(tracker_state->calibration_sample_count);
-    debug.z_layers = tracker_state->z_layers_m;
-    debug.tracked_image_x_px =
-        static_cast<float>(tracker_state->tracked_armor.image_center_x_px);
-    debug.rotation_direction = tracker_state->rotation_direction;
-  }
-  if (center_image_x_px.has_value() && tracker_state.has_value()) {
-    debug.center_image_x_px = static_cast<float>(*center_image_x_px);
-    debug.center_image_distance_px = static_cast<float>(std::abs(
-        *center_image_x_px - tracker_state->tracked_armor.image_center_x_px));
-  }
-  if (result.has_value()) {
-    debug.target_z = result->target_z_m;
-    debug.raw_yaw = static_cast<float>(result->raw_yaw_rad);
-    debug.raw_pitch = static_cast<float>(result->raw_pitch_rad);
-    debug.command_yaw = static_cast<float>(result->command_yaw_rad);
-    debug.command_pitch = static_cast<float>(result->command_pitch_rad);
-    debug.flight_time_sec = static_cast<float>(result->flight_time_sec);
-    debug.pitch_locked = result->pitch_locked;
   }
   if (controller_result.has_value()) {
-    debug.matched_z_layer = controller_result->matched_z_layer;
-    debug.average_period_sec =
-        static_cast<float>(controller_result->average_period_sec);
-    debug.zone_stamp = secondsToStamp(controller_result->zone_stamp_sec);
-    debug.permit_stamp = secondsToStamp(controller_result->permit_stamp_sec);
     debug.in_shoot_zone = controller_result->in_shoot_zone;
-    debug.countdown_active = controller_result->countdown_active;
     debug.countdown_remaining_sec =
         static_cast<float>(controller_result->countdown_remaining_sec);
-    debug.shoot_ready = controller_result->shoot_ready;
   }
   debug_pub_->publish(debug);
+}
+
+void AimAntitopNode::publishImageVisualization(
+    const hero_msgs::msg::ArmorPoseArray &message,
+    const std::optional<AntitopTrackerState> &tracker_state,
+    const std::optional<double> &center_image_x_px,
+    const std::optional<AntitopControllerResult> &controller_result) {
+  if (!image_visualization_pub_ ||
+      image_visualization_pub_->get_subscription_count() == 0U) {
+    return;
+  }
+
+  sensor_msgs::msg::Image::ConstSharedPtr image;
+  {
+    std::lock_guard<std::mutex> lock(image_mutex_);
+    const auto image_it = std::find_if(
+        recent_images_.rbegin(), recent_images_.rend(),
+        [&message](const sensor_msgs::msg::Image::ConstSharedPtr &candidate) {
+          return hasSameStamp(candidate->header.stamp, message.header.stamp);
+        });
+    if (image_it == recent_images_.rend()) {
+      return;
+    }
+    image = *image_it;
+  }
+
+  try {
+    auto cv_image = cv_bridge::toCvCopy(image, "bgr8");
+    cv::Mat &canvas = cv_image->image;
+    const bool in_shoot_zone =
+        controller_result.has_value() && controller_result->in_shoot_zone;
+    const float countdown_remaining_sec = controller_result.has_value()
+                                                ? static_cast<float>(controller_result->countdown_remaining_sec)
+                                                : 0.0F;
+
+    if (center_image_x_px.has_value() &&
+        std::isfinite(*center_image_x_px)) {
+      const int center_x = std::clamp(
+          static_cast<int>(std::lround(*center_image_x_px)), 0,
+          std::max(0, canvas.cols - 1));
+      const int enter_left = std::clamp(
+          static_cast<int>(std::lround(*center_image_x_px -
+                                       enter_zone_threshold_px_)),
+          0, std::max(0, canvas.cols - 1));
+      const int enter_right = std::clamp(
+          static_cast<int>(std::lround(*center_image_x_px +
+                                       enter_zone_threshold_px_)),
+          0, std::max(0, canvas.cols - 1));
+      const int exit_left = std::clamp(
+          static_cast<int>(std::lround(*center_image_x_px -
+                                       exit_zone_threshold_px_)),
+          0, std::max(0, canvas.cols - 1));
+      const int exit_right = std::clamp(
+          static_cast<int>(std::lround(*center_image_x_px +
+                                       exit_zone_threshold_px_)),
+          0, std::max(0, canvas.cols - 1));
+
+      cv::Mat overlay = canvas.clone();
+      cv::rectangle(overlay, cv::Point(enter_left, 0),
+                    cv::Point(enter_right, canvas.rows - 1),
+                    in_shoot_zone ? cv::Scalar(0, 0, 220)
+                                  : cv::Scalar(0, 180, 180),
+                    cv::FILLED);
+      cv::addWeighted(overlay, 0.16, canvas, 0.84, 0.0, canvas);
+      cv::line(canvas, cv::Point(exit_left, 0),
+               cv::Point(exit_left, canvas.rows - 1), cv::Scalar(0, 160, 255),
+               1, cv::LINE_AA);
+      cv::line(canvas, cv::Point(exit_right, 0),
+               cv::Point(exit_right, canvas.rows - 1), cv::Scalar(0, 160, 255),
+               1, cv::LINE_AA);
+      cv::line(canvas, cv::Point(center_x, 0),
+               cv::Point(center_x, canvas.rows - 1), cv::Scalar(255, 255, 0),
+               2, cv::LINE_AA);
+      cv::putText(canvas, "ROT CENTER", cv::Point(center_x + 6, 24),
+                  cv::FONT_HERSHEY_SIMPLEX, 0.55, cv::Scalar(255, 255, 0), 2,
+                  cv::LINE_AA);
+    }
+
+    if (tracker_state.has_value() && canvas.cols > 0) {
+      const int tracked_x = std::clamp(
+          static_cast<int>(std::lround(
+              tracker_state->tracked_armor.image_center_x_px)),
+          0, canvas.cols - 1);
+      cv::line(canvas, cv::Point(tracked_x, 0),
+               cv::Point(tracked_x, canvas.rows - 1), cv::Scalar(0, 255, 0),
+               1, cv::LINE_AA);
+    }
+
+    const bool tracking_valid = tracker_state.has_value();
+    const bool center_valid = tracking_valid && tracker_state->center_valid;
+    const bool calibrated = tracking_valid && tracker_state->calibrated;
+    const auto put_status = [&canvas](const std::string &text, int row,
+                                      const cv::Scalar &color) {
+      cv::putText(canvas, text, cv::Point(12, row),
+                  cv::FONT_HERSHEY_SIMPLEX, 0.62, color, 2, cv::LINE_AA);
+    };
+    put_status("[ ANTITOP ]", 30, cv::Scalar(0, 255, 255));
+    put_status(tracking_valid ? "TRACK: OK" : "TRACK: --", 58,
+               tracking_valid ? cv::Scalar(0, 220, 0)
+                              : cv::Scalar(160, 160, 160));
+    put_status(center_valid ? "CENTER: OK" : "CENTER: --", 84,
+               center_valid ? cv::Scalar(0, 220, 0)
+                            : cv::Scalar(160, 160, 160));
+    put_status(calibrated ? "CALIB: OK" : "CALIB: --", 110,
+               calibrated ? cv::Scalar(0, 220, 0)
+                          : cv::Scalar(160, 160, 160));
+    put_status(in_shoot_zone ? "ZONE: IN" : "ZONE: OUT", 136,
+               in_shoot_zone ? cv::Scalar(0, 0, 255)
+                             : cv::Scalar(160, 160, 160));
+    put_status(cv::format("COUNT: %.2fs", countdown_remaining_sec), 162,
+               countdown_remaining_sec > 0.0F ? cv::Scalar(0, 180, 255)
+                                               : cv::Scalar(160, 160, 160));
+
+    image_visualization_pub_->publish(*cv_image->toImageMsg());
+  } catch (const std::exception &error) {
+    RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000,
+                         "反前哨图像可视化发布失败：%s", error.what());
+  }
 }
 
 void AimAntitopNode::publishVisualization(
