@@ -9,7 +9,9 @@ source /opt/ros/humble/setup.bash
 hero_openvino_dir="${OpenVINO_DIR:-}"
 if [[ -z "${hero_openvino_dir}" || ! -f "${hero_openvino_dir}/OpenVINOConfig.cmake" ]]; then
   hero_openvino_config=$(find "${HOME}/.local" -type f \
-    -path '*/openvino/cmake/OpenVINOConfig.cmake' -print -quit 2>/dev/null)
+    \( -path '*/openvino/cmake/OpenVINOConfig.cmake' -o \
+       -path '*/runtime/cmake/OpenVINOConfig.cmake' \) \
+    -print -quit 2>/dev/null)
   if [[ -z "${hero_openvino_config}" ]]; then
     echo "未找到 OpenVINOConfig.cmake。请安装 OpenVINO，或先设置 OpenVINO_DIR。" >&2
     exit 1

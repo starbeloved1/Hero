@@ -7,7 +7,7 @@ gimbal_driver_node:
     enable_fire: true
     command_flag: 1
 
-    virtual_mode: 2
+    virtual_mode: 4
     # 己方颜色：0蓝色，1红色
     virtual_robot_color: 0
     
@@ -24,6 +24,6 @@ gimbal_driver_node:
     antibase_chunk_gap_ms: 2.0
     antibase_queue_depth: 64
     # 仅本地裁判/MQTT 闭环测试启用：五个串口分片写成功后，将同一完整 300B逻辑包镜像到 localhost 的裁判模拟器。比赛测试保持 false
-    antibase_udp_mirror_enabled: false
-    antibase_udp_mirror_host: 127.0.0.1
+    antibase_udp_mirror_enabled: true
+    antibase_udp_mirror_host: 192.168.1.1
     antibase_udp_mirror_port: 9999
